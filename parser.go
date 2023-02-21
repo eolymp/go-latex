@@ -1,0 +1,570 @@
+package latex
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"regexp"
+	"strings"
+)
+
+var whitespaces = regexp.MustCompile("[ \t\n\r]+")
+var identifier = regexp.MustCompile("^\\\\[a-zA-Z]+$")
+
+type Parser struct {
+	tokens *Tokenizer
+	defs   map[string]string
+}
+
+func NewParser(r io.RuneScanner) *Parser {
+	return &Parser{tokens: NewTokenizer(r), defs: map[string]string{}}
+}
+
+func (p *Parser) Define(key, val string) {
+	p.defs[key] = val
+}
+
+func (p *Parser) Value(key string) string {
+	return p.defs[key]
+}
+
+func (p *Parser) Parse() (*Node, error) {
+	children, _, err := p.vertical(func(a any, err error) bool {
+		return err == io.EOF
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Node{Kind: DocumentKind, Children: children}, nil
+}
+
+// horizontal collects text span nodes, it expects to discover text fragments which will be displayed horizontally (one next to another)
+func (p *Parser) horizontal(stop func(any, error) bool) (children []*Node, err error) {
+	for {
+		t, err := p.tokens.Token()
+		if stop(t, err) {
+			return children, nil
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		node, inline, err := p.parse(t)
+		if err != nil {
+			return nil, err
+		}
+
+		if node == nil {
+			continue
+		}
+
+		if !inline {
+			return nil, errors.New("block token in horizontal mode")
+		}
+
+		// merge consequent text nodes together
+		if node.Kind == TextKind && len(children) > 0 && children[len(children)-1].Kind == TextKind {
+			children[len(children)-1].Data += node.Data
+			continue
+		}
+
+		children = append(children, node)
+	}
+}
+
+// vertical stacks block nodes, it expects to discover paragraphs and blocks which will be displayed vertically (one below another)
+func (p *Parser) vertical(stop func(any, error) bool) (children []*Node, last any, err error) {
+	floating := &Node{Kind: ElementKind, Data: "\\par"}
+	newline := false
+
+	flush := func() {
+		if len(floating.Children) == 0 {
+			return
+		}
+
+		children = append(children, floating)
+		floating = &Node{Kind: ElementKind, Data: "\\par"}
+	}
+
+	// add whatever is hanging in floating paragraph before return
+	defer flush()
+
+	for {
+		t, err := p.tokens.Token()
+		if stop(t, err) {
+			return children, t, nil
+		}
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		node, inline, err := p.parse(t)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if node == nil {
+			continue
+		}
+
+		if !inline {
+			flush()
+			children = append(children, node)
+			continue
+		}
+
+		if newline && node.Kind == TextKind && strings.TrimSpace(node.Data) == "" && strings.HasSuffix(node.Data, "\n") {
+			flush()
+			continue
+		}
+
+		// remember if this line ends with \n, if next one is empty line we will start new paragraph (condition above)
+		newline = node.Kind == TextKind && strings.HasSuffix(node.Data, "\n")
+
+		// merge consequent text nodes together
+		if node.Kind == TextKind && len(floating.Children) > 0 && floating.Children[len(floating.Children)-1].Kind == TextKind {
+			floating.Children[len(floating.Children)-1].Data += node.Data
+			continue
+		}
+
+		floating.Children = append(floating.Children, node)
+	}
+}
+
+func (p *Parser) parse(t any) (*Node, bool, error) {
+	switch token := t.(type) {
+	case Text:
+		return &Node{Kind: TextKind, Data: string(token)}, true, nil
+	case Symbol:
+		return &Node{Kind: TextKind, Data: symbol(string(token))}, true, nil
+	case Command:
+		return p.command(token)
+	case Verbatim:
+		return p.verbatim(token)
+	case EnvironmentStart:
+		return p.environment(token)
+	case ParameterStart:
+		children, err := p.horizontal(func(a any, err error) bool {
+			_, ok := a.(ParameterEnd)
+			return err == nil && ok
+		})
+
+		return &Node{Kind: ElementKind, Data: "{}", Children: children}, true, err
+	default:
+		return nil, false, fmt.Errorf("unexpected token %T", t)
+	}
+}
+
+func (p *Parser) command(c Command) (*Node, bool, error) {
+	switch c {
+	case "\\\\", "\\\\*", "\\newline":
+		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
+	case "\\ldots":
+		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
+	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge":
+		return p.format(c)
+	case "\\includegraphics":
+		return p.graphics(c)
+	case "\\url":
+		return p.url(c)
+	case "\\href":
+		return p.href(c)
+	case "\\def":
+		return p.def(c)
+	case "\\epigraph":
+		return p.epigraph(c)
+	default:
+		if v, ok := p.defs[string(c)]; ok {
+			return &Node{Kind: TextKind, Data: v}, true, nil
+		}
+
+		return nil, false, fmt.Errorf("unknown command %v", c)
+	}
+}
+
+func (p *Parser) verbatim(v Verbatim) (*Node, bool, error) {
+	switch v.Kind {
+	case "$":
+		return &Node{Kind: ElementKind, Data: "$", Children: []*Node{{Kind: TextKind, Data: v.Data}}}, true, nil
+	case "$$":
+		return &Node{Kind: ElementKind, Data: "$$", Children: []*Node{{Kind: TextKind, Data: v.Data}}}, false, nil
+	case "%", "comment":
+		return nil, false, nil
+	case "\\verb", "\\verb*":
+		return &Node{Kind: ElementKind, Data: v.Kind, Children: []*Node{{Kind: TextKind, Data: v.Data}}}, true, nil
+	case "verbatim", "lstlisting":
+		return &Node{Kind: ElementKind, Data: v.Kind, Children: []*Node{{Kind: TextKind, Data: v.Data}}}, false, nil
+	default:
+		return nil, false, fmt.Errorf("unknown verbatim \"%v\"", v.Kind)
+	}
+}
+
+func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
+	switch e.Name {
+	case "center":
+		return p.division(e)
+	case "itemize", "enumerate":
+		return p.list(e)
+	case "tabular":
+		return p.tabular(e)
+	default:
+		return nil, true, fmt.Errorf("unknown environment %v", e.Name)
+	}
+}
+
+// format is a command without parameters
+func (p *Parser) format(c Command) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	children, err := p.parameter(token)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Children: children}, true, nil
+}
+
+// graphics reads \\includegraphics command
+func (p *Parser) graphics(c Command) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	token, options, err := p.optionString(token)
+	if err != nil {
+		return nil, false, err
+	}
+
+	src, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, err
+	}
+
+	params := map[string]string{}
+	params["src"] = src
+	if options != "" {
+		params["options"] = options
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: params}, false, nil
+}
+
+// url reads \\url command
+func (p *Parser) url(c Command) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	href, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"href": href}}, true, nil
+}
+
+// href reads \\href command
+func (p *Parser) href(c Command) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	href, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, err
+	}
+
+	token, err = p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	children, err := p.parameter(token)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"href": href}, Children: children}, true, nil
+}
+
+// def reads \\def command
+func (p *Parser) def(c Command) (*Node, bool, error) {
+	// def is followed by identifier (ie. command)
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read def identifier: %w", err)
+	}
+
+	key, ok := token.(Command)
+	if !ok || !identifier.MatchString(string(key)) {
+		return nil, false, errors.New("def must be followed by identifier, for example: \\xyz, got ")
+	}
+
+	// after identifier we should have parameter-value
+	token, err = p.tokens.Token()
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read def value: %w", err)
+	}
+
+	val, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid value in def: %w", err)
+	}
+
+	p.Define(string(key), val)
+
+	return nil, false, nil
+}
+
+// epigraph reads \\epigraph command
+func (p *Parser) epigraph(c Command) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read epigraph text parameter: %w", err)
+	}
+
+	text, err := p.parameter(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid epigraph text parameter: %w", err)
+	}
+
+	token, err = p.tokens.Token()
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read epigraph source parameter: %w", err)
+	}
+
+	source, err := p.parameter(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid epigraph source parameter: %w", err)
+	}
+
+	node := &Node{Kind: ElementKind, Data: string(c), Children: []*Node{
+		{Kind: ElementKind, Data: "\\epigraph:text", Children: text},
+		{Kind: ElementKind, Data: "\\epigraph:source", Children: source},
+	}}
+
+	return node, false, nil
+}
+
+// division reads an environment without any parameter or special content requirements
+func (p *Parser) division(e EnvironmentStart) (*Node, bool, error) {
+	children, _, err := p.vertical(func(a any, err error) bool {
+		n, ok := a.(EnvironmentEnd)
+		return err == nil && ok && n.Name == e.Name
+	})
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: e.Name, Children: children}, false, nil
+}
+
+// list reads an environment with multiple items defined by \\item command
+func (p *Parser) list(e EnvironmentStart) (*Node, bool, error) {
+	var items []*Node
+	itimized := false
+
+	for {
+		children, last, err := p.vertical(func(a any, err error) bool {
+			if err != nil {
+				return false
+			}
+
+			if n, ok := a.(EnvironmentEnd); ok {
+				return n.Name == e.Name
+			}
+
+			if c, ok := a.(Command); ok {
+				return string(c) == "\\item"
+			}
+
+			return false
+		})
+
+		if err != nil {
+			return nil, false, err
+		}
+
+		if itimized {
+			items = append(items, &Node{Kind: ElementKind, Data: "\\item", Children: children})
+		}
+
+		// this skip content until we found first \\item
+		itimized = true
+
+		if _, ok := last.(EnvironmentEnd); ok {
+			break
+		}
+	}
+
+	return &Node{Kind: ElementKind, Data: e.Name, Children: items}, false, nil
+}
+
+// tabular reads tabular environment, where cells are separated by "&" and rows are separated by \\
+func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, errors.New("unable to read parameter for tabular environment")
+	}
+
+	token, pos, err := p.optionString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read tabular environment [pos] parameter: %w", err)
+	}
+
+	colspec, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read tabular environment {colspec} parameter: %w", err)
+	}
+
+	var rows []*Node
+	hanging := &Node{Kind: ElementKind, Data: "\\row"}
+
+	addCell := func(nodes []*Node) {
+		if len(nodes) > 0 {
+			hanging.Children = append(hanging.Children, &Node{Kind: ElementKind, Data: "\\cell", Children: nodes})
+		}
+	}
+
+	addHanging := func() {
+		if len(hanging.Children) > 0 {
+			rows = append(rows, hanging)
+			hanging = &Node{Kind: ElementKind, Data: "\\row"}
+		}
+	}
+
+	for {
+		children, last, err := p.vertical(func(a any, err error) bool {
+			if err != nil {
+				return false
+			}
+
+			if n, ok := a.(EnvironmentEnd); ok {
+				return n.Name == e.Name
+			}
+
+			if n, ok := a.(Symbol); ok {
+				return n == "&"
+			}
+
+			if c, ok := a.(Command); ok {
+				return isNewline(string(c)) || string(c) == "\\hline"
+			}
+
+			return false
+		})
+
+		if err != nil {
+			return nil, false, err
+		}
+
+		// depending on how we stopped reading,
+		if n, ok := last.(Symbol); ok && n == "&" {
+			// stopped by "&", add new cell
+			addCell(children)
+			continue
+		}
+
+		if c, ok := last.(Command); ok {
+			// stopped by newline, add new row
+			if isNewline(string(c)) {
+				addCell(children)
+				addHanging()
+				continue
+			}
+
+			// stopped by hline, override current row with hline and start a new row
+			if string(c) == "\\hline" {
+				addHanging()
+				rows = append(rows, &Node{Kind: ElementKind, Data: "\\hline"})
+				continue
+			}
+		}
+
+		// stopped by environment end, exit
+		if _, ok := last.(EnvironmentEnd); ok {
+			addCell(children)
+			addHanging()
+			break
+		}
+	}
+
+	params := map[string]string{"colspec": colspec}
+	if pos != "" {
+		params["pos"] = pos
+	}
+
+	return &Node{Kind: ElementKind, Parameters: params, Data: e.Name, Children: rows}, false, nil
+}
+
+// option reads optional parameter (wrapped in []) if token "t" is optional parameter start
+// it returns t if it's not optional parameter start, or next token after optional parameter ends
+func (p *Parser) option(t any) (any, []*Node, error) {
+	if _, ok := t.(OptionalStart); !ok {
+		return t, nil, nil
+	}
+
+	node, err := p.horizontal(func(a any, err error) bool {
+		_, ok := a.(OptionalEnd)
+		return err == nil && ok
+	})
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	next, err := p.tokens.Token()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return next, node, nil
+}
+
+// optionString reads optional parameter and returns it as a string
+func (p *Parser) optionString(t any) (any, string, error) {
+	token, option, err := p.option(t)
+	if err != nil || option == nil {
+		return token, "", err
+	}
+
+	value, err := stringify(option)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return token, value, nil
+}
+
+// parameter reads obligatory (wrapped in {}) parameter
+func (p *Parser) parameter(t any) (children []*Node, err error) {
+	if _, ok := t.(ParameterStart); !ok {
+		return nil, errors.New("command must be followed by parameter")
+	}
+
+	return p.horizontal(func(a any, err error) bool {
+		_, ok := a.(ParameterEnd)
+		return err == nil && ok
+	})
+}
+
+// parameterString reads obligatory parameter and returns it as a string
+func (p *Parser) parameterString(t any) (string, error) {
+	parameter, err := p.parameter(t)
+	if err != nil {
+		return "", err
+	}
+
+	return stringify(parameter)
+}

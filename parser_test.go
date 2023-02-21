@@ -497,6 +497,21 @@ func TestParser(t *testing.T) {
 				par(text("\nLegend starts here...")),
 			),
 		},
+		{
+			name:  "problem environment",
+			input: "\\begin{problem}{Шахівниця}{standard input}{standard output}{1 second}{256 megabytes} \n \nДано шахівницю $8\\times 8$. \\end{problem}",
+			output: doc(
+				elementp("problem", map[string]string{"title": "Шахівниця", "input": "standard input", "output": "standard output", "time_limit": "1 second", "memory_limit": "256 megabytes"},
+					par(text(" \n")),
+					par(text("Дано шахівницю "), element("$", text("8\\times 8")), text(". ")),
+				),
+			),
+		},
+		{
+			name:   "example environment",
+			input:  "\\begin{example}\nfoobar\\end{example}",
+			output: doc(element("example", par(text("\nfoobar")))),
+		},
 	}
 
 	for _, tc := range tt {

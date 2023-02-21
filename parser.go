@@ -8,12 +8,15 @@ import (
 	"strings"
 )
 
-var whitespaces = regexp.MustCompile("[ \t\n\r]+")
 var identifier = regexp.MustCompile("^\\\\[a-zA-Z]+$")
 
 type Parser struct {
 	tokens *Tokenizer
 	defs   map[string]string
+}
+
+func Parse(r io.RuneScanner) (*Node, error) {
+	return NewParser(r).Parse()
 }
 
 func NewParser(r io.RuneScanner) *Parser {
@@ -205,12 +208,14 @@ func (p *Parser) verbatim(v Verbatim) (*Node, bool, error) {
 
 func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 	switch e.Name {
-	case "center":
+	case "center", "example":
 		return p.division(e)
 	case "itemize", "enumerate":
 		return p.list(e)
 	case "tabular":
 		return p.tabular(e)
+	case "problem":
+		return p.problem(e)
 	default:
 		return nil, true, fmt.Errorf("unknown environment %v", e.Name)
 	}
@@ -506,6 +511,37 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 	}
 
 	return &Node{Kind: ElementKind, Parameters: params, Data: e.Name, Children: rows}, false, nil
+}
+
+// problem reads problem environment, a special environment used for formatting problems in computer science competitions
+func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
+	params := map[string]string{}
+
+	keys := []string{"title", "input", "output", "time_limit", "memory_limit"}
+	for index, key := range keys {
+		token, err := p.tokens.Token()
+		if err != nil {
+			return nil, false, err
+		}
+
+		val, err := p.parameterString(token)
+		if err != nil {
+			return nil, false, fmt.Errorf("unable to read parameter #%d (%s) in problem environment: %w", index, key, err)
+		}
+
+		params[key] = val
+	}
+
+	children, _, err := p.vertical(func(a any, err error) bool {
+		e, ok := a.(EnvironmentEnd)
+		return err == nil && ok && e.Name == "problem"
+	})
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: "problem", Parameters: params, Children: children}, false, nil
 }
 
 // option reads optional parameter (wrapped in []) if token "t" is optional parameter start

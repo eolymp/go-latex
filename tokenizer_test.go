@@ -335,6 +335,16 @@ func TestLexer(t *testing.T) {
 				latex.Symbol("ð"),
 			},
 		},
+		{
+			name:  "char with whitespaces",
+			input: "\\texttt{\\char 94}",
+			output: []any{
+				latex.Command("\\texttt"),
+				latex.ParameterStart{},
+				latex.Symbol("^"),
+				latex.ParameterEnd{},
+			},
+		},
 	}
 
 	for _, tc := range tt {

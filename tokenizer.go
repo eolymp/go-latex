@@ -275,6 +275,10 @@ func (l *Tokenizer) readBlockEnd() (any, error) {
 }
 
 func (l *Tokenizer) readChar() (any, error) {
+	if err := l.Skip(); err != nil {
+		return nil, err
+	}
+
 	first, _, err := l.r.ReadRune()
 	if err != nil {
 		return nil, err

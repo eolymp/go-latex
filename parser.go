@@ -262,7 +262,7 @@ func (p *Parser) format(c Command) (*Node, bool, error) {
 func (p *Parser) graphics(c Command) (*Node, bool, error) {
 	params := map[string]string{}
 
-	options, ok, err := p.optionv()
+	options, ok, err := p.optionVerbatim()
 	if err != nil {
 		return nil, false, err
 	}
@@ -271,7 +271,7 @@ func (p *Parser) graphics(c Command) (*Node, bool, error) {
 		params["options"] = options
 	}
 
-	src, ok, err := p.parameterv()
+	src, ok, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, err
 	}
@@ -285,7 +285,7 @@ func (p *Parser) graphics(c Command) (*Node, bool, error) {
 
 // url reads \\url command
 func (p *Parser) url(c Command) (*Node, bool, error) {
-	href, _, err := p.parameterv()
+	href, _, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, err
 	}
@@ -295,7 +295,7 @@ func (p *Parser) url(c Command) (*Node, bool, error) {
 
 // href reads \\href command
 func (p *Parser) href(c Command) (*Node, bool, error) {
-	href, _, err := p.parameterv()
+	href, _, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, err
 	}
@@ -321,7 +321,7 @@ func (p *Parser) def(c Command) (*Node, bool, error) {
 		return nil, false, errors.New("def must be followed by identifier, for example: \\xyz, got ")
 	}
 
-	val, _, err := p.parameterv()
+	val, _, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid value in def: %w", err)
 	}
@@ -353,7 +353,7 @@ func (p *Parser) epigraph(c Command) (*Node, bool, error) {
 
 // vspace reads \\vspace command
 func (p *Parser) vspace(c Command) (*Node, bool, error) {
-	height, _, err := p.parameterv()
+	height, _, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid vspace parameter: %w", err)
 	}
@@ -418,12 +418,12 @@ func (p *Parser) list(e EnvironmentStart) (*Node, bool, error) {
 
 // tabular reads tabular environment, where cells are separated by "&" and rows are separated by \\
 func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
-	pos, _, err := p.optionv()
+	pos, _, err := p.optionString()
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to read tabular environment [pos] parameter: %w", err)
 	}
 
-	colspec, _, err := p.parameterv()
+	colspec, _, err := p.parameterString()
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to read tabular environment {colspec} parameter: %w", err)
 	}
@@ -514,7 +514,7 @@ func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 
 	keys := []string{"title", "input", "output", "time_limit", "memory_limit"}
 	for index, key := range keys {
-		val, ok, err := p.parameterv()
+		val, ok, err := p.parameterVerbatim()
 		if err != nil {
 			return nil, false, fmt.Errorf("unable to read parameter #%d (%s) in problem environment: %w", index, key, err)
 		}
@@ -539,17 +539,17 @@ func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 }
 
 func (p *Parser) wrapfigure(e EnvironmentStart) (*Node, bool, error) {
-	lineheight, _, err := p.optionv()
+	lineheight, _, err := p.optionVerbatim()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid wrapfigure lineheight parameter: %w", err)
 	}
 
-	position, _, err := p.parameterv()
+	position, _, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid wrapfigure position parameter: %w", err)
 	}
 
-	width, _, err := p.parameterv()
+	width, _, err := p.parameterVerbatim()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid wrapfigure width parameter: %w", err)
 	}
@@ -604,8 +604,8 @@ func (p *Parser) option() ([]*Node, bool, error) {
 	return val, true, err
 }
 
-// optionv reads optional parameter in verbatim mode
-func (p *Parser) optionv() (string, bool, error) {
+// optionVerbatim reads optional parameter in verbatim mode
+func (p *Parser) optionVerbatim() (string, bool, error) {
 	char, err := p.tokens.Peek()
 	if err == io.EOF {
 		return "", false, nil
@@ -629,6 +629,17 @@ func (p *Parser) optionv() (string, bool, error) {
 	})
 
 	return val, true, err
+}
+
+// optionString reads optional parameter and transforms it to string
+func (p *Parser) optionString() (str string, ok bool, err error) {
+	val, ok, err := p.option()
+	if !ok || err != nil {
+		return "", ok, err
+	}
+
+	str, err = stringify(val)
+	return
 }
 
 // parameter reads obligatory (wrapped in {}) parameter
@@ -663,8 +674,8 @@ func (p *Parser) parameter() (children []*Node, ok bool, err error) {
 	return val, true, err
 }
 
-// parameterv reads obligatory parameter in verbatim mode
-func (p *Parser) parameterv() (str string, ok bool, err error) {
+// parameterVerbatim reads obligatory parameter in verbatim mode
+func (p *Parser) parameterVerbatim() (str string, ok bool, err error) {
 	if err := p.tokens.Skip(); err != nil {
 		return "", false, err
 	}
@@ -692,4 +703,15 @@ func (p *Parser) parameterv() (str string, ok bool, err error) {
 	})
 
 	return val, true, err
+}
+
+// parameterString reads obligatory parameter and transforms it to string
+func (p *Parser) parameterString() (str string, ok bool, err error) {
+	val, ok, err := p.parameter()
+	if !ok || err != nil {
+		return "", ok, err
+	}
+
+	str, err = stringify(val)
+	return
 }

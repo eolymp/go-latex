@@ -550,6 +550,28 @@ func TestParser(t *testing.T) {
 				par(text(" baz")),
 			),
 		},
+		{
+			name:  "p12360",
+			input: "\\begin{wrapfigure}{r}{0.30}\n\\vspace{-20pt}\n  \\begin{center}\n    \\includegraphics[width=0.30]{pic.jpg}\n  \\end{center}\n  \\vspace{-20pt}\n  \\vspace{1pt}\n\\end{wrapfigure}\n",
+			output: doc(
+				elementp("wrapfigure", map[string]string{"position": "r", "width": "0.30"},
+					par(text("\n")),
+					elementp("\\vspace", map[string]string{"height": "-20pt"}),
+					par(text("  ")),
+					element("center",
+						par(text("\n    ")),
+						elementp("\\includegraphics", map[string]string{"options": "width=0.30", "src": "pic.jpg"}),
+						par(text("\n  ")),
+					),
+					par(text("\n  ")),
+					elementp("\\vspace", map[string]string{"height": "-20pt"}),
+					par(text("\n  ")),
+					elementp("\\vspace", map[string]string{"height": "1pt"}),
+					par(text("\n")),
+				),
+				par(text("\n")),
+			),
+		},
 	}
 
 	for _, tc := range tt {

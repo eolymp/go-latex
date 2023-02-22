@@ -148,6 +148,10 @@ func (p *Parser) parse(t any) (*Node, bool, error) {
 		return p.command(token)
 	case Verbatim:
 		return p.verbatim(token)
+	case OptionalStart:
+		return &Node{Kind: TextKind, Data: "["}, true, nil
+	case OptionalEnd:
+		return &Node{Kind: TextKind, Data: "]"}, true, nil
 	case EnvironmentStart:
 		return p.environment(token)
 	case ParameterStart:
@@ -201,6 +205,8 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return p.def(c)
 	case "\\epigraph":
 		return p.epigraph(c)
+	case "\\vspace":
+		return p.vspace(c)
 	default:
 		if v, ok := p.defs[string(c)]; ok {
 			return &Node{Kind: TextKind, Data: v}, true, nil
@@ -237,6 +243,8 @@ func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 		return p.tabular(e)
 	case "problem":
 		return p.problem(e)
+	case "wrapfigure":
+		return p.wrapfigure(e)
 	default:
 		return nil, true, fmt.Errorf("unknown environment %v", e.Name)
 	}
@@ -380,6 +388,21 @@ func (p *Parser) epigraph(c Command) (*Node, bool, error) {
 	}}
 
 	return node, false, nil
+}
+
+// vspace reads \\vspace command
+func (p *Parser) vspace(c Command) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, fmt.Errorf("unable to read vspace parameter: %w", err)
+	}
+
+	height, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid vspace parameter: %w", err)
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"height": height}}, false, nil
 }
 
 // division reads an environment without any parameter or special content requirements
@@ -554,15 +577,62 @@ func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 	}
 
 	children, _, err := p.vertical(func(a any, err error) bool {
-		e, ok := a.(EnvironmentEnd)
-		return err == nil && ok && e.Name == "problem"
+		n, ok := a.(EnvironmentEnd)
+		return err == nil && ok && n.Name == e.Name
 	})
 
 	if err != nil {
 		return nil, false, err
 	}
 
-	return &Node{Kind: ElementKind, Data: "problem", Parameters: params, Children: children}, false, nil
+	return &Node{Kind: ElementKind, Data: e.Name, Parameters: params, Children: children}, false, nil
+}
+
+func (p *Parser) wrapfigure(e EnvironmentStart) (*Node, bool, error) {
+	token, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	token, lineheight, err := p.optionString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid wrapfigure lineheight parameter: %w", err)
+	}
+
+	position, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid wrapfigure position parameter: %w", err)
+	}
+
+	token, err = p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	width, err := p.parameterString(token)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid wrapfigure width parameter: %w", err)
+	}
+
+	params := map[string]string{
+		"position": position,
+		"width":    width,
+	}
+
+	if lineheight != "" {
+		params["lineheight"] = lineheight
+	}
+
+	children, _, err := p.vertical(func(a any, err error) bool {
+		n, ok := a.(EnvironmentEnd)
+		return err == nil && ok && n.Name == e.Name
+	})
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: e.Name, Parameters: params, Children: children}, false, nil
 }
 
 // option reads optional parameter (wrapped in []) if token "t" is optional parameter start

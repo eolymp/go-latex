@@ -572,6 +572,11 @@ func TestParser(t *testing.T) {
 				par(text("\n")),
 			),
 		},
+		{
+			name:   "p12587",
+			input:  "\\includegraphics{https://foo.com/www.bar.com/wp-content/uploads/2021/02/4cbe8d_f1ed2800a49649848102c68fc5a66e53mv2.gif?fit=476%2C280&ssl=1}",
+			output: doc(elementp("\\includegraphics", map[string]string{"src": "https://foo.com/www.bar.com/wp-content/uploads/2021/02/4cbe8d_f1ed2800a49649848102c68fc5a66e53mv2.gif?fit=476%2C280&ssl=1"})),
+		},
 	}
 
 	for _, tc := range tt {

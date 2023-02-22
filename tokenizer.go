@@ -53,6 +53,23 @@ func (l *Tokenizer) Token() (any, error) {
 	}
 }
 
+// Verbatim reads input until stop returns true
+func (l *Tokenizer) Verbatim(stop func(rune, error) bool) (string, error) {
+	var runes []rune
+	for {
+		read, _, err := l.r.ReadRune()
+		if stop(read, err) {
+			return string(runes), nil
+		}
+
+		if err != nil {
+			return "", err
+		}
+
+		runes = append(runes, read)
+	}
+}
+
 func (l *Tokenizer) readText() (any, error) {
 	var runes []rune
 	for {

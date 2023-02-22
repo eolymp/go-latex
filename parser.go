@@ -661,17 +661,20 @@ func (p *Parser) option(t any) (any, []*Node, error) {
 
 // optionString reads optional parameter and returns it as a string
 func (p *Parser) optionString(t any) (any, string, error) {
-	token, option, err := p.option(t)
-	if err != nil || option == nil {
-		return token, "", err
+	if _, ok := t.(OptionalStart); !ok {
+		return t, "", nil
 	}
 
-	value, err := stringify(option)
+	val, err := p.tokens.Verbatim(func(r rune, err error) bool {
+		return err == io.EOF || (err == nil && r == ']')
+	})
+
+	next, err := p.tokens.Token()
 	if err != nil {
 		return nil, "", err
 	}
 
-	return token, value, nil
+	return next, val, nil
 }
 
 // parameter reads obligatory (wrapped in {}) parameter
@@ -695,11 +698,20 @@ func (p *Parser) parameter(t any) (children []*Node, err error) {
 }
 
 // parameterString reads obligatory parameter and returns it as a string
-func (p *Parser) parameterString(t any) (string, error) {
-	parameter, err := p.parameter(t)
-	if err != nil {
-		return "", err
+func (p *Parser) parameterString(t any) (str string, err error) {
+	// skip whitespaces before parameter start
+	if txt, ok := t.(Text); ok && strings.TrimSpace(string(txt)) == "" {
+		t, err = p.tokens.Token()
+		if err != nil {
+			return
+		}
 	}
 
-	return stringify(parameter)
+	if _, ok := t.(ParameterStart); !ok {
+		return "", errors.New("command must be followed by parameter")
+	}
+
+	return p.tokens.Verbatim(func(r rune, err error) bool {
+		return err == io.EOF || (err == nil && r == '}')
+	})
 }

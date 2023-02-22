@@ -53,7 +53,7 @@ func (l *Tokenizer) Token() (any, error) {
 	}
 }
 
-// Verbatim reads input until stop returns true
+// Verbatim reads input rune by rune until stop returns true
 func (l *Tokenizer) Verbatim(stop func(rune, error) bool) (string, error) {
 	var runes []rune
 	for {
@@ -68,6 +68,15 @@ func (l *Tokenizer) Verbatim(stop func(rune, error) bool) (string, error) {
 
 		runes = append(runes, read)
 	}
+}
+
+func (l *Tokenizer) Peek() (rune, error) {
+	read, _, err := l.r.ReadRune()
+	if err != nil {
+		return 0, err
+	}
+
+	return read, l.r.UnreadRune()
 }
 
 func (l *Tokenizer) readText() (any, error) {
@@ -153,10 +162,10 @@ func (l *Tokenizer) readBackslash() (any, error) {
 		}
 
 		if star {
-			return Command([]rune{'\\', r, '*'}), l.whitespaces()
+			return Command([]rune{'\\', r, '*'}), l.Skip()
 		}
 
-		return Command([]rune{'\\', r}), l.whitespaces()
+		return Command([]rune{'\\', r}), l.Skip()
 	}
 
 	// a letter means it's a named command \xyz
@@ -207,7 +216,7 @@ func (l *Tokenizer) readCommand(start rune) (any, error) {
 		case "\\end":
 			return l.readBlockEnd()
 		default:
-			if err := l.whitespaces(); err != nil {
+			if err := l.Skip(); err != nil {
 				return nil, err
 			}
 
@@ -272,7 +281,7 @@ func (l *Tokenizer) readLineComment() (any, error) {
 	for {
 		read, _, err := l.r.ReadRune()
 		if err == io.EOF || read == '\n' {
-			if err := l.whitespaces(); err != nil {
+			if err := l.Skip(); err != nil {
 				return nil, err
 			}
 
@@ -311,7 +320,7 @@ func (l *Tokenizer) readLigature(first rune) (any, error) {
 // readVerbatimBlock reads verbatim block (ie. block where all markup is ignored) of a given type (eg. comment, verbatim etc)
 // until it finds closing \\end command.
 func (l *Tokenizer) readVerbatimBlock(kind string) (any, error) {
-	if err := l.whitespaces(); err != nil {
+	if err := l.Skip(); err != nil {
 		return nil, err
 	}
 
@@ -361,8 +370,8 @@ func (l *Tokenizer) readVerbatim(command string) (any, error) {
 
 }
 
-// whitespaces skips until next non-whitespace symbol
-func (l *Tokenizer) whitespaces() error {
+// Skip until next non-whitespace symbol
+func (l *Tokenizer) Skip() error {
 	for {
 		r, _, err := l.r.ReadRune()
 		if err == io.EOF {
@@ -381,7 +390,7 @@ func (l *Tokenizer) whitespaces() error {
 
 // forwardTo skips whitespaces and makes sure next symbol is "e"
 func (l *Tokenizer) forwardTo(e rune) error {
-	if err := l.whitespaces(); err != nil {
+	if err := l.Skip(); err != nil {
 		return err
 	}
 

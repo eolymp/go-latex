@@ -189,9 +189,7 @@ func (p *Parser) parse(t any) (*Node, bool, error) {
 
 func (p *Parser) command(c Command) (*Node, bool, error) {
 	switch c {
-	case "\\\\", "\\\\*", "\\newline":
-		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
-	case "\\ldots":
+	case "\\\\", "\\\\*", "\\newline", "\\ldots":
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
 	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge":
 		return p.format(c)
@@ -252,12 +250,7 @@ func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 
 // format is a command without parameters
 func (p *Parser) format(c Command) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, err
-	}
-
-	children, err := p.parameter(token)
+	children, _, err := p.parameter()
 	if err != nil {
 		return nil, false, err
 	}
@@ -267,25 +260,24 @@ func (p *Parser) format(c Command) (*Node, bool, error) {
 
 // graphics reads \\includegraphics command
 func (p *Parser) graphics(c Command) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, err
-	}
-
-	token, options, err := p.optionString(token)
-	if err != nil {
-		return nil, false, err
-	}
-
-	src, err := p.parameterString(token)
-	if err != nil {
-		return nil, false, err
-	}
-
 	params := map[string]string{}
-	params["src"] = src
-	if options != "" {
+
+	options, ok, err := p.optionv()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if ok {
 		params["options"] = options
+	}
+
+	src, ok, err := p.parameterv()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if ok {
+		params["src"] = src
 	}
 
 	return &Node{Kind: ElementKind, Data: string(c), Parameters: params}, false, nil
@@ -293,12 +285,7 @@ func (p *Parser) graphics(c Command) (*Node, bool, error) {
 
 // url reads \\url command
 func (p *Parser) url(c Command) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, err
-	}
-
-	href, err := p.parameterString(token)
+	href, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, err
 	}
@@ -308,22 +295,12 @@ func (p *Parser) url(c Command) (*Node, bool, error) {
 
 // href reads \\href command
 func (p *Parser) href(c Command) (*Node, bool, error) {
-	token, err := p.tokens.Token()
+	href, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, err
 	}
 
-	href, err := p.parameterString(token)
-	if err != nil {
-		return nil, false, err
-	}
-
-	token, err = p.tokens.Token()
-	if err != nil {
-		return nil, false, err
-	}
-
-	children, err := p.parameter(token)
+	children, _, err := p.parameter()
 	if err != nil {
 		return nil, false, err
 	}
@@ -344,13 +321,7 @@ func (p *Parser) def(c Command) (*Node, bool, error) {
 		return nil, false, errors.New("def must be followed by identifier, for example: \\xyz, got ")
 	}
 
-	// after identifier we should have parameter-value
-	token, err = p.tokens.Token()
-	if err != nil {
-		return nil, false, fmt.Errorf("unable to read def value: %w", err)
-	}
-
-	val, err := p.parameterString(token)
+	val, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid value in def: %w", err)
 	}
@@ -362,22 +333,12 @@ func (p *Parser) def(c Command) (*Node, bool, error) {
 
 // epigraph reads \\epigraph command
 func (p *Parser) epigraph(c Command) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, fmt.Errorf("unable to read epigraph text parameter: %w", err)
-	}
-
-	text, err := p.parameter(token)
+	text, _, err := p.parameter()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid epigraph text parameter: %w", err)
 	}
 
-	token, err = p.tokens.Token()
-	if err != nil {
-		return nil, false, fmt.Errorf("unable to read epigraph source parameter: %w", err)
-	}
-
-	source, err := p.parameter(token)
+	source, _, err := p.parameter()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid epigraph source parameter: %w", err)
 	}
@@ -392,12 +353,7 @@ func (p *Parser) epigraph(c Command) (*Node, bool, error) {
 
 // vspace reads \\vspace command
 func (p *Parser) vspace(c Command) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, fmt.Errorf("unable to read vspace parameter: %w", err)
-	}
-
-	height, err := p.parameterString(token)
+	height, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid vspace parameter: %w", err)
 	}
@@ -462,17 +418,12 @@ func (p *Parser) list(e EnvironmentStart) (*Node, bool, error) {
 
 // tabular reads tabular environment, where cells are separated by "&" and rows are separated by \\
 func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, errors.New("unable to read parameter for tabular environment")
-	}
-
-	token, pos, err := p.optionString(token)
+	pos, _, err := p.optionv()
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to read tabular environment [pos] parameter: %w", err)
 	}
 
-	colspec, err := p.parameterString(token)
+	colspec, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, fmt.Errorf("unable to read tabular environment {colspec} parameter: %w", err)
 	}
@@ -563,14 +514,13 @@ func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 
 	keys := []string{"title", "input", "output", "time_limit", "memory_limit"}
 	for index, key := range keys {
-		token, err := p.tokens.Token()
-		if err != nil {
-			return nil, false, err
-		}
-
-		val, err := p.parameterString(token)
+		val, ok, err := p.parameterv()
 		if err != nil {
 			return nil, false, fmt.Errorf("unable to read parameter #%d (%s) in problem environment: %w", index, key, err)
+		}
+
+		if !ok {
+			break
 		}
 
 		params[key] = val
@@ -589,27 +539,17 @@ func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 }
 
 func (p *Parser) wrapfigure(e EnvironmentStart) (*Node, bool, error) {
-	token, err := p.tokens.Token()
-	if err != nil {
-		return nil, false, err
-	}
-
-	token, lineheight, err := p.optionString(token)
+	lineheight, _, err := p.optionv()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid wrapfigure lineheight parameter: %w", err)
 	}
 
-	position, err := p.parameterString(token)
+	position, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid wrapfigure position parameter: %w", err)
 	}
 
-	token, err = p.tokens.Token()
-	if err != nil {
-		return nil, false, err
-	}
-
-	width, err := p.parameterString(token)
+	width, _, err := p.parameterv()
 	if err != nil {
 		return nil, false, fmt.Errorf("invalid wrapfigure width parameter: %w", err)
 	}
@@ -635,83 +575,121 @@ func (p *Parser) wrapfigure(e EnvironmentStart) (*Node, bool, error) {
 	return &Node{Kind: ElementKind, Data: e.Name, Parameters: params, Children: children}, false, nil
 }
 
-// option reads optional parameter (wrapped in []) if token "t" is optional parameter start
-// it returns t if it's not optional parameter start, or next token after optional parameter ends
-func (p *Parser) option(t any) (any, []*Node, error) {
-	if _, ok := t.(OptionalStart); !ok {
-		return t, nil, nil
+// option reads optional parameter (wrapped in []) if token "t" is optional parameter start.
+// It returns t if there is no optional parameter, or next token after optional parameter
+func (p *Parser) option() ([]*Node, bool, error) {
+	char, err := p.tokens.Peek()
+	if err == io.EOF {
+		return nil, false, nil
 	}
 
-	node, err := p.horizontal(func(a any, err error) bool {
+	if err != nil || char != '[' {
+		return nil, false, err
+	}
+
+	open, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if _, ok := open.(OptionalStart); !ok {
+		return nil, false, fmt.Errorf("expected optional group beginning, but got %T instead", open)
+	}
+
+	val, err := p.horizontal(func(a any, err error) bool {
 		_, ok := a.(OptionalEnd)
 		return err == nil && ok
 	})
 
-	if err != nil {
-		return nil, nil, err
-	}
-
-	next, err := p.tokens.Token()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return next, node, nil
+	return val, true, err
 }
 
-// optionString reads optional parameter and returns it as a string
-func (p *Parser) optionString(t any) (any, string, error) {
-	if _, ok := t.(OptionalStart); !ok {
-		return t, "", nil
+// optionv reads optional parameter in verbatim mode
+func (p *Parser) optionv() (string, bool, error) {
+	char, err := p.tokens.Peek()
+	if err == io.EOF {
+		return "", false, nil
+	}
+
+	if err != nil || char != '[' {
+		return "", false, err
+	}
+
+	open, err := p.tokens.Token()
+	if err != nil {
+		return "", false, err
+	}
+
+	if _, ok := open.(OptionalStart); !ok {
+		return "", false, fmt.Errorf("expected optional group beginning, but got %T instead", open)
 	}
 
 	val, err := p.tokens.Verbatim(func(r rune, err error) bool {
 		return err == io.EOF || (err == nil && r == ']')
 	})
 
-	next, err := p.tokens.Token()
-	if err != nil {
-		return nil, "", err
-	}
-
-	return next, val, nil
+	return val, true, err
 }
 
 // parameter reads obligatory (wrapped in {}) parameter
-func (p *Parser) parameter(t any) (children []*Node, err error) {
-	// skip whitespaces before parameter start
-	if txt, ok := t.(Text); ok && strings.TrimSpace(string(txt)) == "" {
-		t, err = p.tokens.Token()
-		if err != nil {
-			return
-		}
+func (p *Parser) parameter() (children []*Node, ok bool, err error) {
+	if err := p.tokens.Skip(); err != nil {
+		return nil, false, err
 	}
 
-	if _, ok := t.(ParameterStart); !ok {
-		return nil, errors.New("command must be followed by parameter")
+	char, err := p.tokens.Peek()
+	if err == io.EOF {
+		return nil, false, nil
 	}
 
-	return p.horizontal(func(a any, err error) bool {
+	if err != nil || char != '{' {
+		return nil, false, err
+	}
+
+	open, err := p.tokens.Token()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if _, ok := open.(ParameterStart); !ok {
+		return nil, false, fmt.Errorf("expected parameter group beginning, but got %T instead", open)
+	}
+
+	val, err := p.horizontal(func(a any, err error) bool {
 		_, ok := a.(ParameterEnd)
 		return err == nil && ok
 	})
+
+	return val, true, err
 }
 
-// parameterString reads obligatory parameter and returns it as a string
-func (p *Parser) parameterString(t any) (str string, err error) {
-	// skip whitespaces before parameter start
-	if txt, ok := t.(Text); ok && strings.TrimSpace(string(txt)) == "" {
-		t, err = p.tokens.Token()
-		if err != nil {
-			return
-		}
+// parameterv reads obligatory parameter in verbatim mode
+func (p *Parser) parameterv() (str string, ok bool, err error) {
+	if err := p.tokens.Skip(); err != nil {
+		return "", false, err
 	}
 
-	if _, ok := t.(ParameterStart); !ok {
-		return "", errors.New("command must be followed by parameter")
+	char, err := p.tokens.Peek()
+	if err == io.EOF {
+		return "", false, nil
 	}
 
-	return p.tokens.Verbatim(func(r rune, err error) bool {
+	if err != nil || char != '{' {
+		return "", false, err
+	}
+
+	open, err := p.tokens.Token()
+	if err != nil {
+		return "", false, err
+	}
+
+	if _, ok := open.(ParameterStart); !ok {
+		return "", false, fmt.Errorf("expected parameter group beginning, but got %T instead", open)
+	}
+
+	val, err := p.tokens.Verbatim(func(r rune, err error) bool {
 		return err == io.EOF || (err == nil && r == '}')
 	})
+
+	return val, true, err
 }

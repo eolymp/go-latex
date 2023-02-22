@@ -178,7 +178,16 @@ func (p *Parser) parse(t any) (*Node, bool, error) {
 		if len(children) == 1 {
 			node := children[0]
 
+			// single paragraph means all items were text spans, return node as inline
 			if node.Kind == ElementKind && node.Data == "\\par" {
+				// check if it's group with a command, like this: {\cmd ...} and use \cmd to wrap group, so it looks like \cmd{...}
+				if len(node.Children) != 0 {
+					fc := node.Children[0]
+					if fc.Kind == ElementKind && identifier.MatchString(fc.Data) && len(fc.Children) == 0 {
+						return &Node{Kind: ElementKind, Data: fc.Data, Children: node.Children[1:]}, true, nil
+					}
+				}
+
 				return &Node{Kind: ElementKind, Data: "{}", Children: node.Children}, true, nil
 			}
 
@@ -211,8 +220,12 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return p.epigraph(c)
 	case "\\vspace":
 		return p.vspace(c)
+	case "\\hspace":
+		return p.hspace(c)
 	case "\\exmp":
 		return p.exmp(c)
+	case "\\exmpfile":
+		return p.exmpfile(c)
 	default:
 		if v, ok := p.defs[string(c)]; ok {
 			return &Node{Kind: TextKind, Data: v}, true, nil
@@ -388,19 +401,50 @@ func (p *Parser) vspace(c Command) (*Node, bool, error) {
 	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"height": height}}, false, nil
 }
 
+// hspace reads \\hspace command
+func (p *Parser) hspace(c Command) (*Node, bool, error) {
+	width, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid hspace parameter: %w", err)
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"width": width}}, false, nil
+}
+
 // exmp reads \\exmp command
 func (p *Parser) exmp(c Command) (*Node, bool, error) {
-	left, _, err := p.parameterVerbatim()
+	input, _, err := p.parameterVerbatim()
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid exmp left parameter: %w", err)
+		return nil, false, fmt.Errorf("invalid exmp input parameter: %w", err)
 	}
 
-	right, _, err := p.parameterVerbatim()
+	output, _, err := p.parameterVerbatim()
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid exmp right parameter: %w", err)
+		return nil, false, fmt.Errorf("invalid exmp output parameter: %w", err)
 	}
 
-	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"left": left, "right": right}}
+	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"input": input, "output": output}}
+	return node, false, nil
+}
+
+// exmpfile reads \\exmpfile command
+func (p *Parser) exmpfile(c Command) (*Node, bool, error) {
+	input, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid exmpfile input parameter: %w", err)
+	}
+
+	output, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid exmpfile output parameter: %w", err)
+	}
+
+	name, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid exmpfile name parameter: %w", err)
+	}
+
+	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"input": input, "output": output, "name": name}}
 	return node, false, nil
 }
 

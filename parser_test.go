@@ -585,6 +585,15 @@ func TestParser(t *testing.T) {
 				element("\\epigraph:source"),
 			)),
 		},
+		{
+			name:  "command in group",
+			input: "foo {\\it Hello, and again, welcome to the Aperture Science Enrichment Center.} bar",
+			output: doc(par(
+				text("foo "),
+				element("\\it", text("Hello, and again, welcome to the Aperture Science Enrichment Center.")),
+				text(" bar"),
+			)),
+		},
 	}
 
 	for _, tc := range tt {

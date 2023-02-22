@@ -295,6 +295,46 @@ func TestLexer(t *testing.T) {
 				latex.Text(" use these like that."),
 			},
 		},
+		{
+			name:  "char with one dec",
+			input: "Bo\\char9",
+			output: []any{
+				latex.Text("Bo"),
+				latex.Symbol("\t"),
+			},
+		},
+		{
+			name:  "char with two dec",
+			input: "Bo\\char98",
+			output: []any{
+				latex.Text("Bo"),
+				latex.Symbol("b"),
+			},
+		},
+		{
+			name:  "char with three dec",
+			input: "Mo\\char101",
+			output: []any{
+				latex.Text("Mo"),
+				latex.Symbol("e"),
+			},
+		},
+		{
+			name:  "char with oct",
+			input: "What\\char'77",
+			output: []any{
+				latex.Text("What"),
+				latex.Symbol("?"),
+			},
+		},
+		{
+			name:  "char with hex",
+			input: "Mo\\char\"F0",
+			output: []any{
+				latex.Text("Mo"),
+				latex.Symbol("ð"),
+			},
+		},
 	}
 
 	for _, tc := range tt {

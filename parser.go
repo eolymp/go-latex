@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -192,6 +193,8 @@ func (p *Parser) parse(t any) (*Node, bool, error) {
 
 func (p *Parser) command(c Command) (*Node, bool, error) {
 	switch c {
+	case "\\symbol":
+		return p.symbol(c)
 	case "\\par", "\\\\", "\\\\*", "\\newline", "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples", "\\hskip", "\\vskip":
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
 	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", "\\section", "\\subsection", "\\bfseries", "\\itshape":
@@ -255,6 +258,21 @@ func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 	default:
 		return nil, true, fmt.Errorf("unknown environment %v", e.Name)
 	}
+}
+
+// symbol is a \\symbol command
+func (p *Parser) symbol(c Command) (*Node, bool, error) {
+	val, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, err
+	}
+
+	code, err := strconv.ParseInt(val, 10, 32)
+	if err != nil {
+		return nil, false, fmt.Errorf("symbol command must take an integer as parameter: %w", err)
+	}
+
+	return &Node{Kind: TextKind, Data: string([]rune{int32(code)})}, true, nil
 }
 
 // format is a command without parameters

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -215,6 +216,8 @@ func (l *Tokenizer) readCommand(start rune) (any, error) {
 			return l.readBlockStart()
 		case "\\end":
 			return l.readBlockEnd()
+		case "\\char":
+			return l.readChar()
 		default:
 			if err := l.Skip(); err != nil {
 				return nil, err
@@ -269,6 +272,72 @@ func (l *Tokenizer) readBlockEnd() (any, error) {
 	}
 
 	return EnvironmentEnd{Name: word}, nil
+}
+
+func (l *Tokenizer) readChar() (any, error) {
+	first, _, err := l.r.ReadRune()
+	if err != nil {
+		return nil, err
+	}
+
+	// char with dec code: \\char98
+	if isDigit(first, 10) {
+		if err := l.r.UnreadRune(); err != nil {
+			return nil, err
+		}
+
+		number, err := l.readNumber(10)
+		if err != nil {
+			return nil, fmt.Errorf("\\char must be followed by exactly two digits: %w", err)
+		}
+
+		return Symbol([]rune{rune(number)}), nil
+	}
+
+	// char with oct code: \\char'77
+	if first == '\'' {
+		number, err := l.readNumber(8)
+		if err != nil {
+			return nil, fmt.Errorf("\\char must be followed by oct digits: %w", err)
+		}
+
+		return Symbol([]rune{rune(number)}), nil
+	}
+
+	// char with hex code: \\char"FF
+	if first == '"' {
+		number, err := l.readNumber(16)
+		if err != nil {
+			return nil, fmt.Errorf("\\char\" must be followed by hex digits: %w", err)
+		}
+
+		return Symbol([]rune{rune(number)}), nil
+	}
+
+	return nil, errors.New("\\char must be followed by a digit, ' or \"")
+}
+
+func (l *Tokenizer) readNumber(base int) (n int64, err error) {
+	var buffer []rune
+	for {
+		read, _, err := l.r.ReadRune()
+		if err == io.EOF {
+			return strconv.ParseInt(string(buffer), base, 32)
+		}
+		if err != nil {
+			return 0, err
+		}
+
+		if !isDigit(read, base) {
+			if err := l.r.UnreadRune(); err != nil {
+				return 0, err
+			}
+
+			return strconv.ParseInt(string(buffer), base, 32)
+		}
+
+		buffer = append(buffer, read)
+	}
 }
 
 // readLineComment reads one line comment after %
@@ -448,7 +517,24 @@ func (l *Tokenizer) word() (string, error) {
 
 // isLetter returns true for a letter
 func isLetter(r rune) bool {
-	return 'a' <= r && r <= 'z' || 'A' <= r && r <= 'Z'
+	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
+}
+
+// isDigit returns true for a dec digit
+func isDigit(r rune, base int) bool {
+	if base <= 1 {
+		return r == '0'
+	}
+
+	if base <= 10 {
+		return '0' <= r && r < rune('0'+base)
+	}
+
+	if '0' <= r && r < '9' {
+		return true
+	}
+
+	return 'A' <= r && r <= rune('A'+base-10)
 }
 
 // isSpacial returns true if a symbol has a special meaning and should interrupt text reading

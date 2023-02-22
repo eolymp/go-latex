@@ -151,12 +151,33 @@ func (p *Parser) parse(t any) (*Node, bool, error) {
 	case EnvironmentStart:
 		return p.environment(token)
 	case ParameterStart:
-		children, err := p.horizontal(func(a any, err error) bool {
+		// a bit of guessing here, this is hanging group it may enclose block or inline elements
+		// we parse it as vertical layout and then try to figure it out
+		children, _, err := p.vertical(func(a any, err error) bool {
 			_, ok := a.(ParameterEnd)
 			return err == nil && ok
 		})
 
-		return &Node{Kind: ElementKind, Data: "{}", Children: children}, true, err
+		if err != nil {
+			return nil, false, err
+		}
+
+		// empty group
+		if len(children) == 0 {
+			return &Node{Kind: TextKind}, true, nil
+		}
+
+		if len(children) == 1 {
+			node := children[0]
+
+			if node.Kind == ElementKind && node.Data == "\\par" {
+				return &Node{Kind: ElementKind, Data: "{}", Children: node.Children}, true, nil
+			}
+
+			return children[0], false, nil
+		}
+
+		return &Node{Kind: ElementKind, Data: "{}", Children: children}, false, nil
 	default:
 		return nil, false, fmt.Errorf("unexpected token %T", t)
 	}

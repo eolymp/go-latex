@@ -517,6 +517,39 @@ func TestParser(t *testing.T) {
 			input:  "\\includegraphics[width=5cm, height=5cm] {xx.png}",
 			output: doc(elementp("\\includegraphics", map[string]string{"options": "width=5cm, height=5cm", "src": "xx.png"})),
 		},
+		{
+			name:  "p10675",
+			input: "\\begin{center}\n{\\includegraphics{https://static.eolymp.com/content/2c/2cb0e289dc31d026e2c5481852803fe3a0b8c38b.png}}\\end{center}",
+			output: doc(element("center",
+				par(text("\n")),
+				elementp("\\includegraphics", map[string]string{"src": "https://static.eolymp.com/content/2c/2cb0e289dc31d026e2c5481852803fe3a0b8c38b.png"}),
+			)),
+		},
+		{
+			name:  "unbound empty group",
+			input: "foo {} baz",
+			output: doc(par(
+				text("foo  baz"),
+			)),
+		},
+		{
+			name:  "unbound text group",
+			input: "foo {bar \\textit{bug}} baz",
+			output: doc(par(
+				text("foo "),
+				element("{}", text("bar "), element("\\textit", text("bug"))),
+				text(" baz"),
+			)),
+		},
+		{
+			name:  "unbound block group",
+			input: "foo {one\n\n two} baz",
+			output: doc(
+				par(text("foo ")),
+				element("{}", par(text("one\n")), par(text(" two"))),
+				par(text(" baz")),
+			),
+		},
 	}
 
 	for _, tc := range tt {

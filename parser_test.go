@@ -512,6 +512,11 @@ func TestParser(t *testing.T) {
 			input:  "\\begin{example}\nfoobar\\end{example}",
 			output: doc(element("example", par(text("\nfoobar")))),
 		},
+		{
+			name:   "whitespace between parameters",
+			input:  "\\includegraphics[width=5cm, height=5cm] {xx.png}",
+			output: doc(elementp("\\includegraphics", map[string]string{"options": "width=5cm, height=5cm", "src": "xx.png"})),
+		},
 	}
 
 	for _, tc := range tt {

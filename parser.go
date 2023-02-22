@@ -585,6 +585,14 @@ func (p *Parser) optionString(t any) (any, string, error) {
 
 // parameter reads obligatory (wrapped in {}) parameter
 func (p *Parser) parameter(t any) (children []*Node, err error) {
+	// skip whitespaces before parameter start
+	if txt, ok := t.(Text); ok && strings.TrimSpace(string(txt)) == "" {
+		t, err = p.tokens.Token()
+		if err != nil {
+			return
+		}
+	}
+
 	if _, ok := t.(ParameterStart); !ok {
 		return nil, errors.New("command must be followed by parameter")
 	}

@@ -120,7 +120,10 @@ func (p *Parser) vertical(stop func(any, error) bool) (children []*Node, last an
 			continue
 		}
 
-		if newline && node.Kind == TextKind && strings.TrimSpace(node.Data) == "" && strings.HasSuffix(node.Data, "\n") {
+		// flush floating paragraph
+		empty := node.Kind == TextKind && strings.TrimSpace(node.Data) == "" && strings.HasSuffix(node.Data, "\n")
+		par := node.Kind == ElementKind && node.Data == "\\par" && len(node.Children) == 0
+		if par || (newline && empty) {
 			flush()
 			continue
 		}
@@ -189,9 +192,9 @@ func (p *Parser) parse(t any) (*Node, bool, error) {
 
 func (p *Parser) command(c Command) (*Node, bool, error) {
 	switch c {
-	case "\\\\", "\\\\*", "\\newline", "\\ldots":
+	case "\\par", "\\\\", "\\\\*", "\\newline", "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples", "\\hskip", "\\vskip":
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
-	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge":
+	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", "\\section", "\\subsection", "\\bfseries", "\\itshape":
 		return p.format(c)
 	case "\\includegraphics":
 		return p.graphics(c)
@@ -205,8 +208,14 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return p.epigraph(c)
 	case "\\vspace":
 		return p.vspace(c)
+	case "\\exmp":
+		return p.exmp(c)
 	default:
 		if v, ok := p.defs[string(c)]; ok {
+			return &Node{Kind: TextKind, Data: v}, true, nil
+		}
+
+		if v, ok := replacements[string(c)]; ok {
 			return &Node{Kind: TextKind, Data: v}, true, nil
 		}
 
@@ -359,6 +368,22 @@ func (p *Parser) vspace(c Command) (*Node, bool, error) {
 	}
 
 	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"height": height}}, false, nil
+}
+
+// exmp reads \\exmp command
+func (p *Parser) exmp(c Command) (*Node, bool, error) {
+	left, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid exmp left parameter: %w", err)
+	}
+
+	right, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid exmp right parameter: %w", err)
+	}
+
+	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"left": left, "right": right}}
+	return node, false, nil
 }
 
 // division reads an environment without any parameter or special content requirements

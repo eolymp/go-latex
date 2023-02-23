@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const cmInPixel = 38.7
+
 var identifier = regexp.MustCompile("^\\\\[a-zA-Z]+$")
 
 type Parser struct {

@@ -204,7 +204,9 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 	switch c {
 	case "\\symbol":
 		return p.symbol(c)
-	case "\\par", "\\\\", "\\\\*", "\\newline", "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples", "\\hskip", "\\vskip":
+	case "\\par", "\\\\", "\\\\*", "\\newline", "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples":
+		return &Node{Kind: ElementKind, Data: string(c)}, false, nil
+	case "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\hskip", "\\vskip":
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
 	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", "\\section", "\\subsection", "\\bfseries", "\\itshape":
 		return p.format(c)

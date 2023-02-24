@@ -57,17 +57,17 @@ func MeasurePixels(raw string) (float32, error) {
 func ToPixels(value float32, unit string) (float32, error) {
 	switch unit {
 	case "pt":
-		return float32(value) * (cmInPixel / 0.03515), nil
+		return float32(value) * cmInPixel / 28.4495, nil
 	case "mm":
-		return float32(value) * (cmInPixel / 10), nil
+		return float32(value) * cmInPixel / 10, nil
 	case "cm":
 		return float32(value) * cmInPixel, nil
 	case "in":
 		return float32(value) * cmInPixel * 2.54, nil
 	case "ex":
-		return float32(value) * (cmInPixel / 0.15132), nil
+		return float32(value) * cmInPixel * 0.15132, nil
 	case "em":
-		return float32(value) * (cmInPixel / 0.35146), nil
+		return float32(value) * cmInPixel * 0.35146, nil
 	case "px":
 		return value, nil
 	default:

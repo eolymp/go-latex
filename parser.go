@@ -230,6 +230,8 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return p.exmp(c)
 	case "\\exmpfile":
 		return p.exmpfile(c)
+	case "\\multicolumn", "\\cline":
+		return nil, false, nil
 	default:
 		if v, ok := p.defs[string(c)]; ok {
 			return &Node{Kind: TextKind, Data: v}, true, nil
@@ -522,9 +524,9 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 	var rows []*Node
 	hanging := &Node{Kind: ElementKind, Data: "\\row"}
 
-	addCell := func(nodes []*Node) {
+	addCell := func(nodes []*Node, params map[string]string) {
 		if len(nodes) > 0 {
-			hanging.Children = append(hanging.Children, &Node{Kind: ElementKind, Data: "\\cell", Children: nodes})
+			hanging.Children = append(hanging.Children, &Node{Kind: ElementKind, Data: "\\cell", Parameters: params, Children: nodes})
 		}
 	}
 
@@ -550,7 +552,8 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 			}
 
 			if c, ok := a.(Command); ok {
-				return isNewline(string(c)) || string(c) == "\\hline"
+				return isNewline(string(c)) || string(c) == "\\hline" || string(c) == "\\cline" ||
+					string(c) == "\\multirow" || string(c) == "\\multicolumn"
 			}
 
 			return false
@@ -563,15 +566,68 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 		// depending on how we stopped reading,
 		if n, ok := last.(Symbol); ok && n == "&" {
 			// stopped by "&", add new cell
-			addCell(children)
+			addCell(children, nil)
 			continue
 		}
 
 		if c, ok := last.(Command); ok {
 			// stopped by newline, add new row
 			if isNewline(string(c)) {
-				addCell(children)
+				addCell(children, nil)
 				addHanging()
+				continue
+			}
+
+			// stopped by multirow
+			if string(c) == "\\multirow" {
+				num, _, err := p.parameterVerbatim()
+				if err != nil {
+					return nil, false, err
+				}
+
+				width, _, err := p.parameterVerbatim()
+				if err != nil {
+					return nil, false, err
+				}
+
+				text, _, err := p.parameter()
+				if err != nil {
+					return nil, false, err
+				}
+
+				addCell([]*Node{{Kind: ElementKind, Data: "\\par", Children: text}}, map[string]string{"rowspan": num, "width": width})
+
+				// try to eat next & so we don't create an empty column
+				if err := p.eatATab(); err != nil {
+					return nil, false, err
+				}
+
+				continue
+			}
+
+			// stopped by multicolumn
+			if string(c) == "\\multicolumn" {
+				num, _, err := p.parameterVerbatim()
+				if err != nil {
+					return nil, false, err
+				}
+
+				align, _, err := p.parameterVerbatim()
+				if err != nil {
+					return nil, false, err
+				}
+
+				text, _, err := p.parameter()
+				if err != nil {
+					return nil, false, err
+				}
+
+				addCell([]*Node{{Kind: ElementKind, Data: "\\par", Children: text}}, map[string]string{"colspan": num, "align": align})
+
+				if err := p.eatATab(); err != nil {
+					return nil, false, err
+				}
+
 				continue
 			}
 
@@ -581,11 +637,23 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 				rows = append(rows, &Node{Kind: ElementKind, Data: "\\hline"})
 				continue
 			}
+
+			// stopped by cline
+			if string(c) == "\\cline" {
+				rng, _, err := p.parameterVerbatim()
+				if err != nil {
+					return nil, false, err
+				}
+				
+				addHanging()
+				rows = append(rows, &Node{Kind: ElementKind, Data: "\\cline", Parameters: map[string]string{"range": rng}})
+				continue
+			}
 		}
 
 		// stopped by environment end, exit
 		if _, ok := last.(EnvironmentEnd); ok {
-			addCell(children)
+			addCell(children, nil)
 			addHanging()
 			break
 		}
@@ -597,6 +665,26 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 	}
 
 	return &Node{Kind: ElementKind, Parameters: params, Data: e.Name, Children: rows}, false, nil
+}
+
+// eatATab skips all whitespaces and if it sees & reads it
+// this method helps read tabular environment
+func (p *Parser) eatATab() error {
+	if err := p.tokens.Skip(); err != nil {
+		return err
+	}
+
+	next, err := p.tokens.Peek()
+	if err != nil {
+		return err
+	}
+
+	if next != '&' {
+		return nil
+	}
+
+	_, err = p.tokens.Token()
+	return err
 }
 
 // problem reads problem environment, a special environment used for formatting problems in computer science competitions

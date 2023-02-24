@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+var measure = regexp.MustCompile("^(-?[0-9]*(?:\\.[0-9]+)?)(%|\\\\?[a-z ]*)$")
+var whitespaces = regexp.MustCompile("[ \n\t\r]+")
+
 // KeyValue parses key-value parameters in this format: key=value, key=value, for example as used in \\includegraphics option parameter.
 func KeyValue(raw string) map[string]string {
 	kv := map[string]string{}
@@ -28,7 +31,33 @@ func KeyValue(raw string) map[string]string {
 	return kv
 }
 
-var measure = regexp.MustCompile("^(-?[0-9]*(?:\\.[0-9]+)?)(%|\\\\?[a-z ]*)$")
+type ColumnSpec struct {
+	BorderLeft  bool   // column should have left border
+	BorderRight bool   // column should have right border
+	Align       string // column alignment: c, l or r
+}
+
+// ColumnSpecs parses column spec in tabular environment
+// todo: add support for repeated syntax *{x}{...}
+// todo: if not support, at least correctly handle @{} and !{}
+func ColumnSpecs(raw string) (spec []ColumnSpec) {
+	raw = whitespaces.ReplaceAllString(raw, "") // remove all spaces since they don't have any meaning
+	for pos, char := range raw {
+		if char == '|' {
+			continue
+		}
+
+		if char == 'c' || char == 'l' || char == 'r' {
+			spec = append(spec, ColumnSpec{
+				BorderLeft:  pos > 0 && raw[pos-1] == '|',
+				BorderRight: pos < len(raw)-1 && raw[pos+1] == '|',
+				Align:       string([]rune{char}),
+			})
+		}
+	}
+
+	return
+}
 
 // Measure parses measurement value, a number and units, for example: 5.1cm, 6em, 0.25\textwidth
 func Measure(raw string) (float32, string, error) {

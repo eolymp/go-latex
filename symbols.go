@@ -6,12 +6,12 @@ func symbol(a string) string {
 		return "—"
 	case "--":
 		return "–"
-	case "<":
-		return "‹"
+	//case "<":
+	//	return "‹"
 	case "<<":
 		return "«"
-	case ">":
-		return "›"
+	//case ">":
+	//	return "›"
 	case ">>":
 		return "»"
 	case "''", "``":

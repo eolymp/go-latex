@@ -374,6 +374,10 @@ func (l *Tokenizer) readLigature(first rune) (any, error) {
 	for {
 		read, _, err := l.r.ReadRune()
 		if err == io.EOF {
+			if string(line) == "<" || string(line) == ">" {
+				return Text(line), nil
+			}
+
 			return Symbol(line), nil
 		}
 
@@ -385,6 +389,10 @@ func (l *Tokenizer) readLigature(first rune) (any, error) {
 		case "<<", ">>", "``", "--", "---", "''":
 			line = append(line, read)
 		default:
+			if string(line) == "<" || string(line) == ">" {
+				return Text(line), l.r.UnreadRune()
+			}
+
 			return Symbol(line), l.r.UnreadRune()
 		}
 	}

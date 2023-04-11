@@ -345,6 +345,15 @@ func TestLexer(t *testing.T) {
 				latex.ParameterEnd{},
 			},
 		},
+		{
+			name:  "single quotes are not replaced",
+			input: "text < other text",
+			output: []any{
+				latex.Text("text "),
+				latex.Text("<"),
+				latex.Text(" other text"),
+			},
+		},
 	}
 
 	for _, tc := range tt {

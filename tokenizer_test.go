@@ -105,10 +105,14 @@ func TestLexer(t *testing.T) {
 		},
 		{
 			name:  "block comment",
-			input: "a\\begin{comment}This is the unordered list:\n\\begin{itemize}\n  \\item This is the first item;\n  \\item This is the second item.\n\\end{itemize}\\end{comment}z",
+			input: "a\\begin{comment}This is\n multiline\ncomment\n\\end{comment}z",
 			output: []any{
 				latex.Text("a"),
-				latex.Verbatim{Kind: "comment", Data: "This is the unordered list:\n\\begin{itemize}\n  \\item This is the first item;\n  \\item This is the second item.\n\\end{itemize}"},
+				latex.EnvironmentStart{Name: "comment"},
+				latex.Text("This is\n"),
+				latex.Text(" multiline\n"),
+				latex.Text("comment\n"),
+				latex.EnvironmentEnd{Name: "comment"},
 				latex.Text("z"),
 			},
 		},
@@ -126,7 +130,11 @@ func TestLexer(t *testing.T) {
 			name:  "verbatim environment",
 			input: "\\begin{verbatim}\n10 PRINT \"HELLO WORLD \";\n20 GOTO 10\n\\end{verbatim}",
 			output: []any{
-				latex.Verbatim{Kind: "verbatim", Data: "10 PRINT \"HELLO WORLD \";\n20 GOTO 10\n"},
+				latex.EnvironmentStart{Name: "verbatim"},
+				latex.Text("\n"),
+				latex.Text("10 PRINT \"HELLO WORLD \";\n"),
+				latex.Text("20 GOTO 10\n"),
+				latex.EnvironmentEnd{Name: "verbatim"},
 			},
 		},
 		{

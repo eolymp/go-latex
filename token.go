@@ -6,6 +6,7 @@ type Symbol string
 
 type Verbatim struct {
 	Kind string
+	Attr map[string]string
 	Data string
 }
 

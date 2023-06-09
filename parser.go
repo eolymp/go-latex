@@ -274,6 +274,13 @@ func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 		return p.problem(e)
 	case "wrapfigure":
 		return p.wrapfigure(e)
+	case "comment":
+		_, _, err := p.verbatimEnvironment(e)
+		return nil, false, err
+	case "lstlisting":
+		return p.lstListingEnvironment(e)
+	case "verbatim":
+		return p.verbatimEnvironment(e)
 	default:
 		return nil, true, fmt.Errorf("unknown environment %v", e.Name)
 	}
@@ -644,7 +651,7 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 				if err != nil {
 					return nil, false, err
 				}
-				
+
 				addHanging()
 				rows = append(rows, &Node{Kind: ElementKind, Data: "\\cline", Parameters: map[string]string{"range": rng}})
 				continue
@@ -752,6 +759,40 @@ func (p *Parser) wrapfigure(e EnvironmentStart) (*Node, bool, error) {
 	}
 
 	return &Node{Kind: ElementKind, Data: e.Name, Parameters: params, Children: children}, false, nil
+}
+
+func (p *Parser) lstListingEnvironment(e EnvironmentStart) (*Node, bool, error) {
+	opt, _, err := p.optionVerbatim()
+	if err != nil {
+		return nil, false, err
+	}
+
+	node, inline, err := p.verbatimEnvironment(e)
+	if opt != "" && node != nil {
+		node.Parameters = map[string]string{"options": opt}
+	}
+
+	return node, inline, err
+}
+
+func (p *Parser) verbatimEnvironment(e EnvironmentStart) (*Node, bool, error) {
+	content := ""
+	suffix := "\\end{" + e.Name + "}"
+
+	if err := p.tokens.Skip(); err != nil {
+		return nil, false, err
+	}
+
+	_, err := p.tokens.Verbatim(func(r rune, err error) bool {
+		content += string(r)
+		return err == io.EOF || strings.HasSuffix(content, suffix)
+	})
+
+	if err == io.EOF {
+		err = nil
+	}
+
+	return &Node{Kind: ElementKind, Data: e.Name, Children: []*Node{{Kind: TextKind, Data: strings.TrimSuffix(content, suffix)}}}, false, err
 }
 
 // option reads optional parameter (wrapped in []) if token "t" is optional parameter start.

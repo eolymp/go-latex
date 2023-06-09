@@ -298,6 +298,14 @@ func TestParser(t *testing.T) {
 			),
 		},
 		{
+			name:  "lstlisting with language",
+			input: "Some C++ source code (auto-detecting and highlighting):\n\\begin{lstlisting}[language=C++]\n#include <iostream>\nint main() {\n    int a, b;\n    std::cin >> a >> b;\n    std::cout << a + b << std::endl;\n}\n\\end{lstlisting}",
+			output: doc(
+				par(text("Some C++ source code (auto-detecting and highlighting):\n")),
+				elementp("lstlisting", map[string]string{"options": "language=C++"}, text("#include <iostream>\nint main() {\n    int a, b;\n    std::cin >> a >> b;\n    std::cout << a + b << std::endl;\n}\n")),
+			),
+		},
+		{
 			name:  "cf24",
 			input: "Link to website:\n\\url{https://eolymp.com/}.",
 			output: doc(par(

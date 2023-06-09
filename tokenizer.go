@@ -246,10 +246,6 @@ func (l *Tokenizer) readBlockStart() (any, error) {
 		return nil, err
 	}
 
-	if word == "comment" || word == "lstlisting" || word == "verbatim" {
-		return l.readVerbatimBlock(word)
-	}
-
 	return EnvironmentStart{Name: word}, nil
 }
 
@@ -396,6 +392,31 @@ func (l *Tokenizer) readLigature(first rune) (any, error) {
 			return Symbol(line), l.r.UnreadRune()
 		}
 	}
+}
+
+// readLstListingBlock reads verbatim block (ie. block where all markup is ignored) of a given type (eg. comment, verbatim etc)
+// until it finds closing \\end command.
+func (l *Tokenizer) readLstListingBlock(kind string) (any, error) {
+	next, err := l.Peek()
+	if err != nil {
+		return nil, err
+	}
+
+	if next == '[' {
+		l.Token()
+	}
+
+	token, err := l.readVerbatimBlock(kind)
+	if err != nil {
+		return nil, err
+	}
+
+	verb, ok := token.(Verbatim)
+	if !ok {
+		return verb, nil
+	}
+
+	return verb, nil
 }
 
 // readVerbatimBlock reads verbatim block (ie. block where all markup is ignored) of a given type (eg. comment, verbatim etc)

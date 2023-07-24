@@ -232,6 +232,8 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return p.exmpfile(c)
 	case "\\multicolumn", "\\cline":
 		return nil, false, nil
+	case "\\user":
+		return p.user(c)
 	default:
 		if v, ok := p.defs[string(c)]; ok {
 			return &Node{Kind: TextKind, Data: v}, true, nil
@@ -344,6 +346,16 @@ func (p *Parser) url(c Command) (*Node, bool, error) {
 	}
 
 	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"href": href}}, true, nil
+}
+
+// user reads \\user command
+func (p *Parser) user(c Command) (*Node, bool, error) {
+	href, _, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"nickname": href}}, true, nil
 }
 
 // href reads \\href command

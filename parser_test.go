@@ -640,6 +640,15 @@ func TestParser(t *testing.T) {
 				text(" bar"),
 			)),
 		},
+		{
+			name:  "user mention",
+			input: "i would like \\user{arsijo} to be a judge of this",
+			output: doc(par(
+				text("i would like "),
+				elementp("\\user", map[string]string{"nickname": "arsijo"}),
+				text(" to be a judge of this"),
+			)),
+		},
 	}
 
 	for _, tc := range tt {

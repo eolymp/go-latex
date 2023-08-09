@@ -554,6 +554,15 @@ func TestParser(t *testing.T) {
 			),
 		},
 		{
+			name:  "tutorial environment",
+			input: "\\begin{tutorial}{Шахівниця}how to solve...\\end{tutorial}",
+			output: doc(
+				elementp("tutorial", map[string]string{"title": "Шахівниця"},
+					par(text("how to solve...")),
+				),
+			),
+		},
+		{
 			name:   "example environment",
 			input:  "\\begin{example}\nfoobar\\end{example}",
 			output: doc(element("example", par(text("\nfoobar")))),

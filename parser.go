@@ -274,6 +274,8 @@ func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 		return p.tabular(e)
 	case "problem":
 		return p.problem(e)
+	case "tutorial":
+		return p.tutorial(e)
 	case "wrapfigure":
 		return p.wrapfigure(e)
 	case "comment":
@@ -715,6 +717,36 @@ func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 		val, ok, err := p.parameterVerbatim()
 		if err != nil {
 			return nil, false, fmt.Errorf("unable to read parameter #%d (%s) in problem environment: %w", index, key, err)
+		}
+
+		if !ok {
+			break
+		}
+
+		params[key] = val
+	}
+
+	children, _, err := p.vertical(func(a any, err error) bool {
+		n, ok := a.(EnvironmentEnd)
+		return err == nil && ok && n.Name == e.Name
+	})
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: e.Name, Parameters: params, Children: children}, false, nil
+}
+
+// tutorial reads tutorial environment, a special environment used for formatting tutorials in computer science competitions
+func (p *Parser) tutorial(e EnvironmentStart) (*Node, bool, error) {
+	params := map[string]string{}
+
+	keys := []string{"title"}
+	for index, key := range keys {
+		val, ok, err := p.parameterVerbatim()
+		if err != nil {
+			return nil, false, fmt.Errorf("unable to read parameter #%d (%s) in tutorial environment: %w", index, key, err)
 		}
 
 		if !ok {

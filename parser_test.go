@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+var nbsp = string([]rune{0x00A0})
+
 func TestParser(t *testing.T) {
 	doc := func(children ...*latex.Node) *latex.Node {
 		return &latex.Node{Kind: latex.DocumentKind, Children: children}
@@ -525,11 +527,11 @@ func TestParser(t *testing.T) {
 		},
 		{
 			name:  "cf37",
-			input: "If you want to quote single character, use single quotes: `a'.\n\nIn some statements use <<these double quotes>>. As for the long dashes~--- use these like that.\n\nIn English statements use ``these double quotes''. As for the long dashes \"--- use these like that.",
+			input: "If you want to quote single character, use single quotes: `a'.\n\nIn some statements use <<these double quotes>>. As for the long dashes~--- use these like that.\n\nIn English statements use ``these double quotes''. As for the long dashes~--- use these like that.",
 			output: doc(
 				par(text("If you want to quote single character, use single quotes: 'a'.\n")),
-				par(text("In some statements use «these double quotes». As for the long dashes — use these like that.\n")),
-				par(text("In English statements use \"these double quotes\". As for the long dashes \"— use these like that.")),
+				par(text("In some statements use «these double quotes». As for the long dashes"+nbsp+"— use these like that.\n")),
+				par(text("In English statements use \"these double quotes\". As for the long dashes"+nbsp+"— use these like that.")),
 			),
 		},
 		{

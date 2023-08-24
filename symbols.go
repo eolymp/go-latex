@@ -21,7 +21,7 @@ func symbol(a string) string {
 	case "&":
 		return ""
 	case "~":
-		return " "
+		return string([]rune{0x00A0})
 	default:
 		return a
 	}

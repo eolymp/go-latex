@@ -565,6 +565,15 @@ func TestRender(t *testing.T) {
 				text(" to be a judge of this"),
 			)),
 		},
+		{
+			name:   "nested spans",
+			render: "this is \\textbf{\\textit{bold and slanted}} but still good",
+			document: doc(par(
+				text("this is "),
+				element("\\textbf", element("\\textit", text("bold and slanted"))),
+				text(" but still good"),
+			)),
+		},
 	}
 
 	for _, tc := range tt {

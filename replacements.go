@@ -1,5 +1,18 @@
 package latex
 
+var specials = map[string]string{
+	"—":                    "---",
+	"–":                    "--",
+	"«":                    "<<",
+	"»":                    ">>",
+	string([]rune{0x00A0}): "~",
+	"%":                    "\\%",
+	"{":                    "\\{",
+	"}":                    "\\}",
+	"[":                    "\\[",
+	"]":                    "\\]",
+}
+
 var replacements = map[string]string{
 	"\\textwidth":            "",
 	"\\space":                " ",

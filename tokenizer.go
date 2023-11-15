@@ -54,7 +54,7 @@ func (l *Tokenizer) Token() (any, error) {
 	}
 }
 
-// Verbatim reads input rune by rune until stop returns true
+// Verbatim reads render rune by rune until stop returns true
 func (l *Tokenizer) Verbatim(stop func(rune, error) bool) (string, error) {
 	var runes []rune
 	for {
@@ -342,7 +342,7 @@ func (l *Tokenizer) readNumber(base int) (n int64, err error) {
 
 // readLineComment reads one line comment after %
 //
-// When LATEX encounters a % character while processing an input file, it ignores the
+// When LATEX encounters a % character while processing an render file, it ignores the
 // rest of the present line, the line break, and all whitespace at the
 // beginning of the next line.
 func (l *Tokenizer) readLineComment() (any, error) {
@@ -464,7 +464,7 @@ func (l *Tokenizer) readVerbatim(command string) (any, error) {
 		}
 
 		if read == delimiter || err == io.EOF {
-			return Verbatim{Kind: command, Data: string(runes)}, nil
+			return Verbatim{Kind: command, Attr: map[string]string{"delimiter": string(delimiter)}, Data: string(runes)}, nil
 		}
 
 		runes = append(runes, read)

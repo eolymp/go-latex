@@ -121,7 +121,7 @@ func TestLexer(t *testing.T) {
 			input: "The \\verb|\\ldots| command \\ldots",
 			output: []any{
 				latex.Text("The "),
-				latex.Verbatim{Kind: "\\verb", Data: "\\ldots"},
+				latex.Verbatim{Kind: "\\verb", Data: "\\ldots", Attr: map[string]string{"delimiter": "|"}},
 				latex.Text(" command "),
 				latex.Command("\\ldots"),
 			},
@@ -141,7 +141,7 @@ func TestLexer(t *testing.T) {
 			name:  "verb command with star",
 			input: "\\verb*|like   this :-) |",
 			output: []any{
-				latex.Verbatim{Kind: "\\verb*", Data: "like   this :-) "},
+				latex.Verbatim{Kind: "\\verb*", Data: "like   this :-) ", Attr: map[string]string{"delimiter": "|"}},
 			},
 		},
 		{

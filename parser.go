@@ -442,15 +442,15 @@ func (p *Parser) hspace(c Command) (*Node, bool, error) {
 func (p *Parser) exmp(c Command) (*Node, bool, error) {
 	input, _, err := p.parameterVerbatim()
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid exmp input parameter: %w", err)
+		return nil, false, fmt.Errorf("invalid exmp render parameter: %w", err)
 	}
 
 	output, _, err := p.parameterVerbatim()
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid exmp output parameter: %w", err)
+		return nil, false, fmt.Errorf("invalid exmp document parameter: %w", err)
 	}
 
-	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"input": input, "output": output}}
+	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"render": input, "document": output}}
 	return node, false, nil
 }
 
@@ -458,12 +458,12 @@ func (p *Parser) exmp(c Command) (*Node, bool, error) {
 func (p *Parser) exmpfile(c Command) (*Node, bool, error) {
 	input, _, err := p.parameterVerbatim()
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid exmpfile input parameter: %w", err)
+		return nil, false, fmt.Errorf("invalid exmpfile render parameter: %w", err)
 	}
 
 	output, _, err := p.parameterVerbatim()
 	if err != nil {
-		return nil, false, fmt.Errorf("invalid exmpfile output parameter: %w", err)
+		return nil, false, fmt.Errorf("invalid exmpfile document parameter: %w", err)
 	}
 
 	name, _, err := p.parameterVerbatim()
@@ -471,7 +471,7 @@ func (p *Parser) exmpfile(c Command) (*Node, bool, error) {
 		return nil, false, fmt.Errorf("invalid exmpfile name parameter: %w", err)
 	}
 
-	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"input": input, "output": output, "name": name}}
+	node := &Node{Kind: ElementKind, Data: string(c), Parameters: map[string]string{"render": input, "document": output, "name": name}}
 	return node, false, nil
 }
 
@@ -712,7 +712,7 @@ func (p *Parser) eatATab() error {
 func (p *Parser) problem(e EnvironmentStart) (*Node, bool, error) {
 	params := map[string]string{}
 
-	keys := []string{"title", "input", "output", "time_limit", "memory_limit"}
+	keys := []string{"title", "render", "document", "time_limit", "memory_limit"}
 	for index, key := range keys {
 		val, ok, err := p.parameterVerbatim()
 		if err != nil {

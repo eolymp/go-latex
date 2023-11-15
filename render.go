@@ -166,10 +166,10 @@ func renderElement(w io.Writer, node *Node) error {
 			rows = append(rows, strings.TrimSpace(buffer.String())+suffix)
 		}
 
-		_, err := fmt.Fprint(w, "\\begin{tabular}"+colspec+"\n", strings.Join(rows, "\n"), "\n\\end{tabular}")
+		_, err := fmt.Fprint(w, "\\begin{tabular}"+colspec+"\n", strings.Join(rows, "\n"), "\n\\end{tabular}\n\n")
 		return err
 	case "itemize", "enumerate", "center", "example":
-		return renderChildrenAndWrap(node, w, "\\begin{"+node.Data+"}\n", "\\end{"+node.Data+"}")
+		return renderChildrenAndWrap(node, w, "\\begin{"+node.Data+"}\n", "\\end{"+node.Data+"}\n\n")
 	case "{}":
 		return renderChildren(w, node)
 	case "\\row":
@@ -215,7 +215,7 @@ func renderElement(w io.Writer, node *Node) error {
 			params = "[" + opts + "]"
 		}
 
-		_, err := fmt.Fprint(w, "\\includegraphics", params, "{", src, "}")
+		_, err := fmt.Fprint(w, "\\includegraphics", params, "{", src, "}\n\n")
 		return err
 
 	case "\\url":

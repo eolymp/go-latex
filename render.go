@@ -112,7 +112,10 @@ func renderElement(w io.Writer, node *Node) error {
 		_, err := fmt.Fprint(w, node.Data+"\n")
 		return err
 
-	case "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples", "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\hskip", "\\vskip", "\\hline", "\\cline", "\\multicolumn", "\\vspace", "\\hspace":
+	case "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples":
+		_, err := fmt.Fprint(w, node.Data, "\n\n")
+		return err
+	case "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\hskip", "\\vskip", "\\hline", "\\cline", "\\multicolumn", "\\vspace", "\\hspace":
 		_, err := fmt.Fprint(w, node.Data)
 		return err
 	case "\\epigraph":

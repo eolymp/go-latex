@@ -549,7 +549,7 @@ func TestParser(t *testing.T) {
 			name:  "problem environment",
 			input: "\\begin{problem}{Шахівниця}{standard render}{standard document}{1 second}{256 megabytes} \n \nДано шахівницю $8\\times 8$. \\end{problem}",
 			output: doc(
-				elementp("problem", map[string]string{"title": "Шахівниця", "render": "standard render", "document": "standard document", "time_limit": "1 second", "memory_limit": "256 megabytes"},
+				elementp("problem", map[string]string{"title": "Шахівниця", "input": "standard render", "output": "standard document", "time_limit": "1 second", "memory_limit": "256 megabytes"},
 					par(text(" \n")),
 					par(text("Дано шахівницю "), element("$", text("8\\times 8")), text(". ")),
 				),

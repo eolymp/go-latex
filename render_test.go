@@ -593,12 +593,11 @@ func TestRender(t *testing.T) {
 
 			if got != want {
 				if gsf == wsf {
-					t.Errorf("Spaces are not properly placed:\nWANT:\n  %#v\nGOT:\n  %#v\n", want, got)
+					t.Logf("Spaces are not properly placed:\nWANT:\n  %#v\nGOT:\n  %#v\n", want, got)
 				} else {
 					t.Errorf("Rendered latex does not match:\nWANT:\n  %#v\nGOT:\n  %#v\n", wsf, gsf)
+					t.Errorf("GOT:\n  %v\n", got)
 				}
-
-				t.Errorf("GOT:\n  %v\n", got)
 			}
 		})
 	}

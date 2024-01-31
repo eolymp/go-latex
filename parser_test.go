@@ -660,6 +660,11 @@ func TestParser(t *testing.T) {
 				text(" to be a judge of this"),
 			)),
 		},
+		{
+			name:   "verbatim parameter with {}",
+			input:  "\\exmp{\\{[]\\}}{OK}",
+			output: doc(elementp("\\exmp", map[string]string{"input": "{[]}", "output": "OK"})),
+		},
 	}
 
 	for _, tc := range tt {

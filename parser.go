@@ -12,6 +12,7 @@ import (
 const cmInPixel = 38.7
 
 var identifier = regexp.MustCompile("^\\\\[a-zA-Z]+$")
+var escSeq = map[string]string{"\\\\": "\\", "\\{": "{", "\\}": "}", "\\[": "[", "\\]": "]"}
 
 type Parser struct {
 	tokens *Tokenizer
@@ -888,9 +889,28 @@ func (p *Parser) optionVerbatim() (string, bool, error) {
 		return "", false, fmt.Errorf("expected optional group beginning, but got %T instead", open)
 	}
 
+	escape := false
 	val, err := p.tokens.Verbatim(func(r rune, err error) bool {
-		return err == io.EOF || (err == nil && r == ']')
+		if err != nil {
+			return err == io.EOF
+		}
+
+		if escape { // previous rune was \, so ignore this one
+			escape = false
+			return false
+		}
+
+		if r == '\\' { // we read \ so next rune should be escaped
+			escape = true
+			return false
+		}
+
+		return r == ']' // stop when we found unescaped bracket
 	})
+
+	for f, t := range escSeq {
+		val = strings.ReplaceAll(val, f, t)
+	}
 
 	return val, true, err
 }
@@ -962,9 +982,28 @@ func (p *Parser) parameterVerbatim() (str string, ok bool, err error) {
 		return "", false, fmt.Errorf("expected parameter group beginning, but got %T instead", open)
 	}
 
+	escape := false
 	val, err := p.tokens.Verbatim(func(r rune, err error) bool {
-		return err == io.EOF || (err == nil && r == '}')
+		if err != nil {
+			return err == io.EOF
+		}
+
+		if escape { // previous rune was \, so ignore this one
+			escape = false
+			return false
+		}
+
+		if r == '\\' { // we read \ so next rune should be escaped
+			escape = true
+			return false
+		}
+
+		return r == '}' // stop when we found unescaped bracket
 	})
+
+	for f, t := range escSeq {
+		val = strings.ReplaceAll(val, f, t)
+	}
 
 	return val, true, err
 }

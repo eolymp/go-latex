@@ -215,6 +215,8 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return p.format(c)
 	case "\\includegraphics":
 		return p.graphics(c)
+	case "\\includemedia":
+		return p.media(c)
 	case "\\url":
 		return p.url(c)
 	case "\\href":
@@ -287,7 +289,7 @@ func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 	case "verbatim":
 		return p.verbatimEnvironment(e)
 	default:
-		return nil, true, fmt.Errorf("unknown environment %v", e.Name)
+		return p.division(e)
 	}
 }
 
@@ -318,6 +320,31 @@ func (p *Parser) format(c Command) (*Node, bool, error) {
 
 // graphics reads \\includegraphics command
 func (p *Parser) graphics(c Command) (*Node, bool, error) {
+	params := map[string]string{}
+
+	options, ok, err := p.optionVerbatim()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if ok {
+		params["options"] = options
+	}
+
+	src, ok, err := p.parameterVerbatim()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if ok {
+		params["src"] = src
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Parameters: params}, false, nil
+}
+
+// media reads \\includemedia command
+func (p *Parser) media(c Command) (*Node, bool, error) {
 	params := map[string]string{}
 
 	options, ok, err := p.optionVerbatim()
@@ -478,6 +505,17 @@ func (p *Parser) exmpfile(c Command) (*Node, bool, error) {
 
 // division reads an environment without any parameter or special content requirements
 func (p *Parser) division(e EnvironmentStart) (*Node, bool, error) {
+	var params map[string]string
+
+	opt, _, err := p.optionVerbatim()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if opt != "" {
+		params = map[string]string{"options": opt}
+	}
+
 	children, _, err := p.vertical(func(a any, err error) bool {
 		n, ok := a.(EnvironmentEnd)
 		return err == nil && ok && n.Name == e.Name
@@ -487,7 +525,7 @@ func (p *Parser) division(e EnvironmentStart) (*Node, bool, error) {
 		return nil, false, err
 	}
 
-	return &Node{Kind: ElementKind, Data: e.Name, Children: children}, false, nil
+	return &Node{Kind: ElementKind, Data: e.Name, Children: children, Parameters: params}, false, nil
 }
 
 // list reads an environment with multiple items defined by \\item command

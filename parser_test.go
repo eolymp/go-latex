@@ -109,6 +109,17 @@ func TestParser(t *testing.T) {
 				}),
 				par(text(" some text after...")),
 			),
+		}, {
+			name:  "media",
+			input: "This is a video \\includemedia[scale=1.5]{eolymp.mov} some text after...",
+			output: doc(
+				par(text("This is a video ")),
+				elementp("\\includemedia", map[string]string{
+					"options": "scale=1.5",
+					"src":     "eolymp.mov",
+				}),
+				par(text(" some text after...")),
+			),
 		},
 		{
 			name:   "oneline comment",
@@ -664,6 +675,15 @@ func TestParser(t *testing.T) {
 			name:   "verbatim parameter with {}",
 			input:  "\\exmp{\\{[]\\}}{OK}",
 			output: doc(elementp("\\exmp", map[string]string{"input": "{[]}", "output": "OK"})),
+		},
+		{
+			name:  "custom environment with parameter",
+			input: "\\begin{grid}[columns=6]\n  This content is in the block.\n\n  $abacaba$\n\\end{grid}",
+			output: doc(elementp("grid",
+				map[string]string{"options": "columns=6"},
+				par(text("\n  This content is in the block.\n")),
+				par(text("  "), element("$", text("abacaba")), text("\n")),
+			)),
 		},
 	}
 

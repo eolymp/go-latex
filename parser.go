@@ -941,7 +941,7 @@ func (p *Parser) verbatimEnvironment(e EnvironmentStart) (*Node, bool, error) {
 	content := ""
 	suffix := "\\end{" + e.Name + "}"
 
-	if err := p.tokens.Skip(); err != nil {
+	if err := p.tokens.SkipEOL(); err != nil {
 		return nil, false, err
 	}
 

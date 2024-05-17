@@ -319,6 +319,13 @@ func TestParser(t *testing.T) {
 			),
 		},
 		{
+			name:  "lstlisting with whitespace prefix",
+			input: "\\begin{lstlisting}[language=C++]\n    int a, b;\n    std::cin >> a >> b;\n\\end{lstlisting}",
+			output: doc(
+				elementp("lstlisting", map[string]string{"options": "language=C++"}, text("    int a, b;\n    std::cin >> a >> b;\n")),
+			),
+		},
+		{
 			name:  "cf24",
 			input: "Link to website:\n\\url{https://eolymp.com/}.",
 			output: doc(par(

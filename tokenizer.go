@@ -490,6 +490,28 @@ func (l *Tokenizer) Skip() error {
 	}
 }
 
+// Skip until next non-whitespace symbol or end of line
+func (l *Tokenizer) SkipEOL() error {
+	for {
+		r, _, err := l.r.ReadRune()
+		if err == io.EOF {
+			return nil
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if !isWhitespace(r) {
+			return l.r.UnreadRune()
+		}
+
+		if r == '\n' {
+			return nil
+		}
+	}
+}
+
 // forwardTo skips whitespaces and makes sure next symbol is "e"
 func (l *Tokenizer) forwardTo(e rune) error {
 	if err := l.Skip(); err != nil {

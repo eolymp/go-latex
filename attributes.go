@@ -11,21 +11,89 @@ import (
 var measure = regexp.MustCompile("^(-?[0-9]*(?:\\.[0-9]+)?)(%|\\\\?[a-z ]*)$")
 var whitespaces = regexp.MustCompile("[ \n\t\r]+")
 
+type keyValueParserState int
+
+const (
+	parsingKey keyValueParserState = iota
+	parsingValue
+)
+
 // KeyValue parses key-value parameters in this format: key=value, key=value, for example as used in \\includegraphics option parameter.
 func KeyValue(raw string) map[string]string {
 	kv := map[string]string{}
 
-	parts := strings.Split(raw, ",")
-	for _, part := range parts {
-		n := strings.SplitN(strings.TrimSpace(part), "=", 2)
-		if len(n) == 1 {
-			kv[strings.ToLower(n[0])] = ""
-			continue
+	key := ""
+	value := ""
+	escape := rune(0)
+	state := parsingKey
+
+	for idx := 0; idx < len(raw); idx++ {
+		char := rune(raw[idx])
+		next := rune(0)
+		if idx+1 < len(raw) {
+			next = rune(raw[idx+1])
 		}
 
-		if len(n) >= 2 {
-			kv[strings.ToLower(n[0])] = n[1]
+		switch state {
+		case parsingKey:
+			if (char == ' ' || char == '\t') && key == "" { // skip leading key whitespaces
+				continue
+			}
+
+			if char == ',' { // key without value, skipping
+				key = ""
+				continue
+			}
+
+			if char == '=' {
+				state = parsingValue
+				continue
+			}
+
+			key += string(char)
+		case parsingValue:
+			// reached escape final char
+			if escape != 0 && char == escape {
+				for ; idx < len(raw)-1; idx++ { // skip all following whitespaces
+					if raw[idx+1] != ' ' {
+						break
+					}
+				}
+
+				escape = 0
+				continue
+			}
+
+			if escape == 0 && char == ',' {
+				kv[strings.TrimSpace(strings.ToLower(key))] = strings.TrimSpace(value)
+				state = parsingKey
+				escape = 0
+				key = ""
+				value = ""
+				continue
+			}
+
+			if value == "" && char == ' ' {
+				continue
+			}
+
+			if value == "" && (char == '"' || char == '\'') {
+				escape = char
+				continue
+			}
+
+			if escape != 0 && char == '\\' && (next == '\\' || next == '"' || next == escape) {
+				value += string(next)
+				idx++
+				continue
+			}
+
+			value += string(char)
 		}
+	}
+
+	if state == parsingValue && escape == 0 {
+		kv[strings.TrimSpace(strings.ToLower(key))] = strings.TrimSpace(value)
 	}
 
 	return kv

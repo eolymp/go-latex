@@ -685,6 +685,24 @@ func TestParser(t *testing.T) {
 				par(text("  "), element("$", text("abacaba")), text("\n")),
 			)),
 		},
+		{
+			name:  "heading",
+			input: "\\heading[3]{Level three heading}",
+			output: doc(par(elementp("\\heading",
+				map[string]string{"level": "3"},
+				text("Level three heading"),
+			))),
+		},
+		{
+			name:  "tabs",
+			input: "\\begin{tabs}\n  \\item{Tab 1} This is the first item;\n  \\item{Tab 2} This is the second item.\n\\end{tabs}",
+			output: doc(
+				element("tabs",
+					elementp("\\item", map[string]string{"title": "Tab 1"}, par(text(" This is the first item;\n  "))),
+					elementp("\\item", map[string]string{"title": "Tab 2"}, par(text(" This is the second item.\n"))),
+				),
+			),
+		},
 	}
 
 	for _, tc := range tt {

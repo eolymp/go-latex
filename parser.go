@@ -211,8 +211,12 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return &Node{Kind: ElementKind, Data: string(c)}, false, nil
 	case "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\hskip", "\\vskip":
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
-	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", "\\section", "\\subsection", "\\subsubsection", "\\bfseries", "\\itshape":
+	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", "\\bfseries", "\\itshape":
 		return p.format(c)
+	case "\\title", "\\chapter", "\\section", "\\subsection", "\\subsubsection", "\\subsubsubsection":
+		return p.format(c)
+	case "\\heading":
+		return p.heading(c)
 	case "\\includegraphics":
 		return p.graphics(c)
 	case "\\includemedia":
@@ -269,10 +273,12 @@ func (p *Parser) verbatim(v Verbatim) (*Node, bool, error) {
 
 func (p *Parser) environment(e EnvironmentStart) (*Node, bool, error) {
 	switch e.Name {
-	case "center", "example":
+	case "center", "example", "figure":
 		return p.division(e)
 	case "itemize", "enumerate":
 		return p.list(e)
+	case "tabs":
+		return p.tabs(e)
 	case "tabular":
 		return p.tabular(e)
 	case "problem":
@@ -316,6 +322,23 @@ func (p *Parser) format(c Command) (*Node, bool, error) {
 	}
 
 	return &Node{Kind: ElementKind, Data: string(c), Children: children}, true, nil
+}
+
+// heading is a command with a single optional parameter \heading[1]{...}
+func (p *Parser) heading(c Command) (*Node, bool, error) {
+	attr := map[string]string{"level": "1"}
+	if v, _, err := p.optionVerbatim(); err == nil {
+		if level, err := strconv.Atoi(v); err == nil && level >= 1 && level <= 6 {
+			attr["level"] = fmt.Sprintf("%d", level)
+		}
+	}
+
+	children, _, err := p.parameter()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &Node{Kind: ElementKind, Data: string(c), Children: children, Parameters: attr}, true, nil
 }
 
 // graphics reads \\includegraphics command
@@ -560,6 +583,62 @@ func (p *Parser) list(e EnvironmentStart) (*Node, bool, error) {
 
 		// this skip content until we found first \\item
 		itimized = true
+
+		if _, ok := last.(EnvironmentEnd); ok {
+			break
+		}
+	}
+
+	return &Node{Kind: ElementKind, Data: e.Name, Children: items}, false, nil
+}
+
+// tabs reads an environment with multiple items defined by \\item command
+func (p *Parser) tabs(e EnvironmentStart) (*Node, bool, error) {
+	var items []*Node
+	itimized := false
+	attrs := map[string]string{}
+
+	for {
+		children, last, err := p.vertical(func(a any, err error) bool {
+			if err != nil {
+				return false
+			}
+
+			if n, ok := a.(EnvironmentEnd); ok {
+				return n.Name == e.Name
+			}
+
+			if c, ok := a.(Command); ok {
+				return string(c) == "\\item"
+			}
+
+			return false
+		})
+
+		if err != nil {
+			return nil, false, err
+		}
+
+		if itimized {
+			items = append(items, &Node{Kind: ElementKind, Data: "\\item", Children: children, Parameters: attrs})
+			attrs = map[string]string{}
+		}
+
+		// this skip content until we found first \\item
+		if c, ok := last.(Command); ok && c == "\\item" {
+			itimized = true
+
+			if char, err := p.tokens.Peek(); err != io.EOF && char == '{' {
+				t, ok, err := p.parameterString()
+				if err != nil {
+					return nil, false, err
+				}
+
+				if ok {
+					attrs["title"] = t
+				}
+			}
+		}
 
 		if _, ok := last.(EnvironmentEnd); ok {
 			break

@@ -213,7 +213,7 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil
 	case "\\underline", "\\emph", "\\sout", "\\textmd", "\\textbf", "\\textup", "\\textit", "\\textsl", "\\textsc", "\\textsf", "\\textrm", "\\bf", "\\it", "\\t", "\\tt", "\\texttt", "\\tiny", "\\scriptsize", "\\small", "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge", "\\bfseries", "\\itshape":
 		return p.format(c)
-	case "\\title", "\\chapter", "\\section", "\\subsection", "\\subsubsection", "\\subsubsubsection":
+	case "\\title", "\\chapter", "\\section", "\\subsection", "\\subsubsection", "\\subsubsubsection", "\\caption":
 		return p.format(c)
 	case "\\heading":
 		return p.heading(c)

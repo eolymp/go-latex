@@ -710,6 +710,14 @@ func TestParser(t *testing.T) {
 				),
 			),
 		},
+		{
+			name:  "admonition with cyrillic letters",
+			input: "\\begin{admonition}[type=note, title=\"Привіт 👋\"]Як справи? ⁉️\\end{admonition}",
+			output: doc(elementp("admonition",
+				map[string]string{"options": "type=note, title=\"Привіт 👋\""},
+				par(text("Як справи? ⁉️")),
+			)),
+		},
 	}
 
 	for _, tc := range tt {

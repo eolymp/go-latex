@@ -84,11 +84,24 @@ func TestKeyValue(t *testing.T) {
 			input:  "a = 1 , b = 3",
 			output: map[string]string{"a": "1", "b": "3"},
 		},
+		{
+			name:   "cyrillic values",
+			input:  "type=note, title=\"Привіт 👋\"",
+			output: map[string]string{"type": "note", "title": "Привіт 👋"},
+		},
+		{
+			name:   "ignore invalid parts",
+			input:  "type=note @ 2, fo, from=hello@eolymp.com",
+			output: map[string]string{"type": "note", "from": "hello@eolymp.com"},
+		},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			v := KeyValue(tc.input)
+			v, err := KeyValue(tc.input)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if !reflect.DeepEqual(v, tc.output) {
 				t.Errorf("Value does not match: want %v, got %v", tc.output, v)

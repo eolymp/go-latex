@@ -19,11 +19,11 @@ type Parser struct {
 	defs   map[string]string
 }
 
-func Parse(r io.RuneScanner) (*Node, error) {
+func Parse(r Scanner) (*Node, error) {
 	return NewParser(r).Parse()
 }
 
-func NewParser(r io.RuneScanner) *Parser {
+func NewParser(r Scanner) *Parser {
 	return &Parser{tokens: NewTokenizer(r), defs: map[string]string{}}
 }
 

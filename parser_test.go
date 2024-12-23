@@ -1,9 +1,9 @@
 package latex_test
 
 import (
-	"encoding/json"
 	"github.com/eolymp/go-latex"
-	"reflect"
+	"github.com/google/go-cmp/cmp"
+
 	"strings"
 	"testing"
 )
@@ -731,11 +731,8 @@ func TestParser(t *testing.T) {
 
 			want := tc.output
 
-			if !reflect.DeepEqual(want, got) {
-				w, _ := json.MarshalIndent(want, "  ", "  ")
-				g, _ := json.MarshalIndent(got, "  ", "  ")
-
-				t.Errorf("Tree does not match:\nWANT:\n  %s\nGOT:\n  %s\n", w, g)
+			if !cmp.Equal(want, got) {
+				t.Errorf("Tree does not match:\n%s\n", cmp.Diff(want, got))
 			}
 		})
 	}

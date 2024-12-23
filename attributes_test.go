@@ -1,8 +1,9 @@
 package latex
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestMeasure(t *testing.T) {
@@ -103,8 +104,8 @@ func TestKeyValue(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if !reflect.DeepEqual(v, tc.output) {
-				t.Errorf("Value does not match: want %v, got %v", tc.output, v)
+			if !cmp.Equal(v, tc.output) {
+				t.Errorf("Value does not match:\n%s\n", cmp.Diff(tc.output, v))
 			}
 		})
 	}

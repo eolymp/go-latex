@@ -8,11 +8,16 @@ import (
 	"strings"
 )
 
-type Tokenizer struct {
-	r io.RuneScanner
+type Scanner interface {
+	io.RuneScanner
+	io.Seeker
 }
 
-func NewTokenizer(r io.RuneScanner) *Tokenizer {
+type Tokenizer struct {
+	r Scanner
+}
+
+func NewTokenizer(r Scanner) *Tokenizer {
 	return &Tokenizer{r: r}
 }
 
@@ -21,6 +26,13 @@ func (l *Tokenizer) Token() (any, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	pos, err := l.r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+
+	var token any
 
 	switch char {
 	case '{':
@@ -34,24 +46,36 @@ func (l *Tokenizer) Token() (any, error) {
 	case '&', '~', '#', '^', '_':
 		return Symbol([]rune{char}), nil
 	case '`', '\'', '-', '<', '>':
-		return l.readLigature(char)
+		token, err = l.readLigature(char)
 	case '%':
-		return l.readLineComment()
+		token, err = l.readLineComment()
 	case '$':
-		return l.readMath()
+		token, err = l.readMath()
 	case '\\':
-		return l.readBackslash()
+		token, err = l.readBackslash()
 	default:
 		if isSpecial(char) {
-			return nil, fmt.Errorf("trying to read special char %c as text", char)
+			// trying to read special char as text, this should be an error, but we can recover from it
+			return Symbol([]rune{char}), nil
 		}
 
-		if err := l.r.UnreadRune(); err != nil {
+		// go back one symbol as it's part of the text
+		if _, err := l.r.Seek(pos-int64(len(string(char))), io.SeekStart); err != nil {
 			return nil, err
 		}
 
-		return l.readText()
+		token, err = l.readText()
 	}
+
+	if err != nil {
+		if _, err := l.r.Seek(pos, io.SeekStart); err != nil {
+			return nil, err
+		}
+
+		return Text(char), nil
+	}
+
+	return token, nil
 }
 
 // Verbatim reads render rune by rune until stop returns true
@@ -105,6 +129,11 @@ func (l *Tokenizer) readText() (any, error) {
 }
 
 func (l *Tokenizer) readMath() (any, error) {
+	start, err := l.r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+
 	// we already entered math with one $, check if next one is $ too (ie. math block)
 	read, _, err := l.r.ReadRune()
 	if err != nil {
@@ -114,12 +143,26 @@ func (l *Tokenizer) readMath() (any, error) {
 	isBlock := read == '$' // math is described in block (two $$ in the beginning and in the end)
 	isClosing := false     // we found first closing $ for block and expecting one more
 
+	if isBlock {
+		start++
+	}
+
 	var runes = []rune{'$', read}
 
 	for {
 		read, _, err := l.r.ReadRune()
 		if err == io.EOF {
-			return nil, errors.New("EOF: math block is not closed")
+			// the block is not closed, let's recover from this error by returning opening sequence as text
+			if _, err := l.r.Seek(start, io.SeekStart); err != nil {
+				return nil, err
+			}
+
+			// return opening sequence as text
+			if isBlock {
+				return Text("$$"), nil
+			}
+
+			return Text("$"), nil
 		}
 
 		if err != nil {
@@ -209,22 +252,43 @@ func (l *Tokenizer) readCommand(start rune) (any, error) {
 
 		command := string(runes)
 
+		pos, err := l.r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, err
+		}
+
+		var token any
+
 		switch command {
 		case "\\verb", "\\verb*":
-			return l.readVerbatim(command)
+			token, err = l.readVerbatim(command)
 		case "\\begin":
-			return l.readBlockStart()
+			token, err = l.readBlockStart()
 		case "\\end":
-			return l.readBlockEnd()
+			token, err = l.readBlockEnd()
 		case "\\char":
-			return l.readChar()
+			token, err = l.readChar()
 		default:
 			if err := l.Skip(); err != nil {
 				return nil, err
 			}
 
-			return Command(command), nil
+			token = Command(command)
+			err = nil
 		}
+
+		// we couldn't read command, handle error gracefully
+		if err != nil {
+			// go back to the position right after command name
+			if _, err := l.r.Seek(pos, io.SeekStart); err != nil {
+				return nil, err
+			}
+
+			// return command name as text
+			return Text(command), nil
+		}
+
+		return token, nil
 	}
 }
 
@@ -239,7 +303,8 @@ func (l *Tokenizer) readBlockStart() (any, error) {
 	}
 
 	if word == "" {
-		return nil, errors.New("environment name is expected")
+		// error: environment name is expected, but we can recover from it
+		return Text("\\begin{"), nil
 	}
 
 	if err := l.expect('}'); err != nil {
@@ -342,7 +407,7 @@ func (l *Tokenizer) readNumber(base int) (n int64, err error) {
 
 // readLineComment reads one line comment after %
 //
-// When LATEX encounters a % character while processing an render file, it ignores the
+// When LATEX encounters a % character while processing a file, it ignores the
 // rest of the present line, the line break, and all whitespace at the
 // beginning of the next line.
 func (l *Tokenizer) readLineComment() (any, error) {

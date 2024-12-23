@@ -1,11 +1,13 @@
 package latex_test
 
 import (
-	"github.com/eolymp/go-latex"
 	"io"
-	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/eolymp/go-latex"
 )
 
 func TestLexer(t *testing.T) {
@@ -45,6 +47,17 @@ func TestLexer(t *testing.T) {
 			},
 		},
 		{
+			name:  "unclosed math",
+			input: "foo $a_i bar",
+			output: []any{
+				latex.Text("foo "),
+				latex.Text("$"),
+				latex.Text("a"),
+				latex.Symbol("_"),
+				latex.Text("i bar"),
+			},
+		},
+		{
 			name:  "math with escaped $ symbol",
 			input: "foo $a_i^2 + b_i^2 \\$ \\le a_{i+1}^2$ bar",
 			output: []any{
@@ -60,6 +73,17 @@ func TestLexer(t *testing.T) {
 				latex.Text("foo "),
 				latex.Verbatim{Kind: "$$", Data: "a_i^2 + b_i^2 \\le a_{i+1}^2"},
 				latex.Text(" bar"),
+			},
+		},
+		{
+			name:  "unclosed math block",
+			input: "foo $$a_i bar",
+			output: []any{
+				latex.Text("foo "),
+				latex.Text("$$"),
+				latex.Text("a"),
+				latex.Symbol("_"),
+				latex.Text("i bar"),
 			},
 		},
 		{
@@ -362,6 +386,16 @@ func TestLexer(t *testing.T) {
 				latex.Text(" other text"),
 			},
 		},
+		{
+			name:  "unclosed block",
+			input: "one\\begin}...two",
+			output: []any{
+				latex.Text("one"),
+				latex.Text("\\begin"),
+				latex.ParameterEnd{},
+				latex.Text("...two"),
+			},
+		},
 	}
 
 	for _, tc := range tt {
@@ -385,8 +419,8 @@ func TestLexer(t *testing.T) {
 
 			want := tc.output
 
-			if !reflect.DeepEqual(want, got) {
-				t.Errorf("Tokens do not match:\n want %#v\n  got %#v\n", want, got)
+			if !cmp.Equal(want, got) {
+				t.Errorf("Tokens do not match:\n%s\n", cmp.Diff(want, got))
 			}
 		})
 	}

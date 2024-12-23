@@ -60,8 +60,10 @@ func KeyValue(raw string) (map[string]string, error) {
 			switch {
 			case char == ' ':
 				state = stateKeyRead
+				key = strings.ToLower(key)
 			case char == '=':
 				state = stateLookingForValue
+				key = strings.ToLower(key)
 			default:
 				state = stateLookingForKey
 				key = ""

@@ -15,6 +15,7 @@ var identifier = regexp.MustCompile("^\\\\[a-zA-Z]+$")
 var escSeq = map[string]string{"\\\\": "\\", "\\{": "{", "\\}": "}", "\\[": "[", "\\]": "]"}
 
 type Parser struct {
+	strict bool
 	tokens *Tokenizer
 	defs   map[string]string
 }
@@ -23,8 +24,16 @@ func Parse(r Scanner) (*Node, error) {
 	return NewParser(r).Parse()
 }
 
+func Strict(r Scanner) (*Node, error) {
+	return NewStrictParser(r).Parse()
+}
+
 func NewParser(r Scanner) *Parser {
 	return &Parser{tokens: NewTokenizer(r), defs: map[string]string{}}
+}
+
+func NewStrictParser(r Scanner) *Parser {
+	return &Parser{strict: true, tokens: NewTokenizer(r), defs: map[string]string{}}
 }
 
 func (p *Parser) Define(key, val string) {
@@ -40,7 +49,7 @@ func (p *Parser) Parse() (*Node, error) {
 		return err == io.EOF
 	})
 
-	if err != nil {
+	if err != nil && (err != io.EOF || p.strict) {
 		return nil, err
 	}
 
@@ -61,7 +70,11 @@ func (p *Parser) horizontal(stop func(any, error) bool) (children []*Node, err e
 
 		node, inline, err := p.parse(t)
 		if err != nil {
-			return nil, err
+			if p.strict {
+				return nil, err
+			}
+
+			continue
 		}
 
 		if node == nil {
@@ -69,7 +82,11 @@ func (p *Parser) horizontal(stop func(any, error) bool) (children []*Node, err e
 		}
 
 		if !inline {
-			return nil, errors.New("block token in horizontal mode")
+			if p.strict {
+				return nil, errors.New("block token in horizontal mode")
+			}
+
+			continue
 		}
 
 		// merge consequent text nodes together
@@ -111,7 +128,11 @@ func (p *Parser) vertical(stop func(any, error) bool) (children []*Node, last an
 
 		node, inline, err := p.parse(t)
 		if err != nil {
-			return nil, nil, err
+			if p.strict {
+				return nil, nil, err
+			}
+
+			continue
 		}
 
 		if node == nil {
@@ -545,7 +566,13 @@ func (p *Parser) division(e EnvironmentStart) (*Node, bool, error) {
 	})
 
 	if err != nil {
-		return nil, false, err
+		// if there are no children, return error so this node is ignored
+		if p.strict || len(children) == 0 {
+			return nil, false, err
+		}
+
+		// if there are children, return "partial" node
+		return &Node{Kind: ElementKind, Data: e.Name, Children: children, Parameters: params}, false, nil
 	}
 
 	return &Node{Kind: ElementKind, Data: e.Name, Children: children, Parameters: params}, false, nil

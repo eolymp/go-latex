@@ -718,6 +718,17 @@ func TestParser(t *testing.T) {
 				par(text("Як справи? ⁉️")),
 			)),
 		},
+		{
+			name:  "divider",
+			input: "123\\hline456\\hrule789",
+			output: doc(
+				par(text("123")),
+				element("\\hline"),
+				par(text("456")),
+				element("\\hrule"),
+				par(text("789")),
+			),
+		},
 	}
 
 	for _, tc := range tt {

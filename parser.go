@@ -228,7 +228,7 @@ func (p *Parser) command(c Command) (*Node, bool, error) {
 	switch c {
 	case "\\symbol":
 		return p.symbol(c)
-	case "\\par", "\\\\", "\\\\*", "\\newline", "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples":
+	case "\\par", "\\\\", "\\\\*", "\\newline", "\\InputFile", "\\InputData", "\\OutputFile", "\\Note", "\\Scoring", "\\Interaction", "\\Example", "\\Examples", "\\hline", "\\hrule":
 		return &Node{Kind: ElementKind, Data: string(c)}, false, nil
 	case "\\dots", "\\ldots", "\\cdots", "\\vdots", "\\ddots", "\\hskip", "\\vskip":
 		return &Node{Kind: ElementKind, Data: string(c)}, true, nil

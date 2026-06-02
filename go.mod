@@ -1,6 +1,6 @@
 module github.com/eolymp/go-latex
 
-go 1.24.0
+go 1.26.3
 
 toolchain go1.24.1
 

@@ -10,7 +10,7 @@ import (
 	"github.com/eolymp/go-latex"
 )
 
-func TestLexer(t *testing.T) {
+func TestTokenizer_Token(t *testing.T) {
 	tt := []struct {
 		name   string
 		input  string

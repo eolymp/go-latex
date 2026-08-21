@@ -718,7 +718,7 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 			}
 
 			if c, ok := a.(Command); ok {
-				return isNewline(string(c)) || string(c) == "\\hline" || string(c) == "\\cline" ||
+				return string(c) == "\\\\" || string(c) == "\\newline" || string(c) == "\\*" || string(c) == "\\hline" || string(c) == "\\cline" ||
 					string(c) == "\\multirow" || string(c) == "\\multicolumn"
 			}
 
@@ -738,7 +738,7 @@ func (p *Parser) tabular(e EnvironmentStart) (*Node, bool, error) {
 
 		if c, ok := last.(Command); ok {
 			// stopped by newline, add new row
-			if isNewline(string(c)) {
+			if c := string(c); c == "\\\\" || c == "\\newline" || c == "\\*" {
 				addCell(children, nil)
 				addHanging()
 				continue
@@ -1067,7 +1067,7 @@ func (p *Parser) optionString() (str string, ok bool, err error) {
 	}
 
 	str, err = stringify(val)
-	return
+	return str, ok, err
 }
 
 // parameter reads obligatory (wrapped in {}) parameter
@@ -1160,5 +1160,5 @@ func (p *Parser) parameterString() (str string, ok bool, err error) {
 	}
 
 	str, err = stringify(val)
-	return
+	return str, ok, err
 }

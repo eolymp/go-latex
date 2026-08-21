@@ -12,9 +12,5 @@ func stringify(children []*Node) (str string, err error) {
 		str += child.Data
 	}
 
-	return
-}
-
-func isNewline(name string) bool {
-	return name == "\\\\" || name == "\\newline" || name == "\\*"
+	return str, err
 }

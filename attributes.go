@@ -45,14 +45,20 @@ func KeyValue(raw string) (map[string]string, error) {
 
 		switch state {
 		case stateLookingForKey:
-			if isValidAttributeNameChar(char) {
+			if (char >= 'a' && char <= 'z') ||
+				(char >= 'A' && char <= 'Z') ||
+				(char >= '0' && char <= '9') ||
+				(char == '-' || char == '_') {
 				state = stateReadingKey
 				key = string(char)
 			}
 
 			continue
 		case stateReadingKey:
-			if isValidAttributeNameChar(char) {
+			if (char >= 'a' && char <= 'z') ||
+				(char >= 'A' && char <= 'Z') ||
+				(char >= '0' && char <= '9') ||
+				(char == '-' || char == '_') {
 				key += string(char)
 				continue
 			}
@@ -140,11 +146,4 @@ func KeyValue(raw string) (map[string]string, error) {
 			}
 		}
 	}
-}
-
-func isValidAttributeNameChar(char rune) bool {
-	return (char >= 'a' && char <= 'z') ||
-		(char >= 'A' && char <= 'Z') ||
-		(char >= '0' && char <= '9') ||
-		(char == '-' || char == '_')
 }

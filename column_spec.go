@@ -25,5 +25,5 @@ func ColumnSpecs(raw string) (spec []ColumnSpec) {
 		}
 	}
 
-	return
+	return spec
 }

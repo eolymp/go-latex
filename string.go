@@ -9,5 +9,5 @@ func String(node *Node) (out string) {
 		out += String(child)
 	}
 
-	return
+	return out
 }
